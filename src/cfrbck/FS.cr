@@ -1,8 +1,12 @@
 require "dir"
+require "yaml"
 require "progress"
 
 module FS
 	class Traverser
+
+		getter start_dir, output_dir, files, symlinks, ignore_dates, recheck, verbose
+
 		def initialize(start_dir, output_dir)
 			@start_dir = start_dir
 			@output_dir = output_dir
@@ -10,35 +14,16 @@ module FS
 			@symlinks = Meta.new
 			@stored_items = {} of String => String
 			@ignore_dates = false
+			@recheck = 1
 			@verbose = 1
-		end
-
-		private def start_dir
-			@start_dir
-		end
-
-		private def output_dir
-			@output_dir
-		end
-
-		private def files
-			@files
-		end
-
-		private def symlinks
-			@symlinks
-		end
-
-		private def ignore_dates
-			@ignore_dates
 		end
 
 		def set_ignore_dates
 			@ignore_dates = true
 		end
 
-		private def verbose
-			@verbose
+		def recheck=(level)
+			@recheck = level
 		end
 
 		def verbose=(level)
@@ -67,11 +52,12 @@ module FS
 			puts "Compiling file list including dups..." if verbose > 0
 			puts "[#{start_dir}]" if verbose > 1
 			run_dir(1,start_dir)
+			if recheck > 0
+				recheck_run_dir(recheck)
+			end
 
 			write_files
-
 			write_symlinks
-
 			write_metadata
 
 			puts "Done." if verbose > 0
@@ -93,63 +79,90 @@ module FS
 			end
 		end
 
+		private def recheck_run_dir(recheck)
+			puts "Double checking..."
+			diff_files = Meta.new
+			files.each do |key, value|
+				if value.entries.size < 2
+					next
+				end
+				#puts "For #{key} original value: #{(value.entries.first as BackupableInstance).file_path}"
+				reference_checksum = get_file_checksum((value.entries.first as BackupableInstance).file_path)
+				iter = value.entries.each
+				new_array = [iter.next as BackupableInstance] # skip 1st entry
+				item = iter.next
+				until item == Iterator::Stop::INSTANCE
+					#puts "           found potential dup: #{(item as BackupableInstance).file_path}"
+					file_checksum = get_file_checksum((item as BackupableInstance).file_path)
+					if file_checksum != reference_checksum
+						index = file_checksum + "::" + key
+						if diff_files.has_key?(index)
+							diff_files[index].push item
+						else
+							diff_files[index] = Entity.new item
+						end
+						#puts "*** In fact, it WAS a fake dup!"
+					else
+						new_array << item as BackupableInstance
+						# noop
+						#puts "+cool: #{reference_checksum} (#{(value.entries.first as BackupableInstance).file_path}) v. #{file_checksum} (#{(item as BackupableInstance).file_path})"
+					end
+					item  = iter.next
+				end
+				if new_array.size != value.entries.size
+					value.entries = new_array
+				end
+			end
+			if diff_files.size > 0
+				# Merge in place...ewww!
+				@files.merge!(diff_files)
+			end
+		end
+
+		private def get_file_checksum(file_path)
+				math = FileUtil::Math.new
+				math.checksum(file_path)
+		end
+
 		# TODO If I used actual unique ids, then I could run multiple backups
 		# in parallel with same output directory
 		# Alternatively I could start threading this code.
 		private def write_files
-			puts "Copying unique files..." if verbose > 0
+			files_count = files.count
+			puts "Copying #{files.size} unique files (for a total of #{files_count} file nodes)..." if verbose > 0
 
 			uniqueid = 0
 
-			sp = Util::SimpleProgress.new files.count
-			onep = files.count / 100.0
-			onep = 1 if onep < 1
-			next_tick = onep
-			processed_count = 0
-			bar = ProgressBar.new
-			bar.total = 100
+			sp = Util::SimpleProgress.new files_count
 
 			files.each do |key, value|
 				index = uniqueid.to_s
 				uniqueid += 1
-				#puts "+ #{uniqueid} -> #{key}:"
-				#puts "- #{item}"
 				# we are going to store first file, regardless
 				# of list size
 				item = value.entries.first.file_path
-				#puts "Copy #{item} to #{File.join(output_dir, uniqueid.to_s)}"
 				FileUtil.copy(item, File.join(output_dir, uniqueid.to_s))
-				processed_count += value.count
-				if processed_count > next_tick
-					next_tick += onep
-					bar.inc if verbose == 1
-				end
+				sp.update value.count if verbose == 1
 			end
-			bar.done if verbose == 1
+
+			sp.done if verbose == 1
 		end
 
 		private def write_symlinks
-			puts "Storing symbolink links..." if verbose > 0
+			puts "Storing #{symlinks.size} symbolink links..." if verbose > 0
 
-			onep = symlinks.count / 100.0
-			onep = 1 if onep < 1
-			next_tick = onep
-			processed_count = 0
-			bar = ProgressBar.new
-			bar.total = 100
+			sp = Util::SimpleProgress.new symlinks.size
 
 			symlinks.each do |key, value|
 				item = (value.entries.first as SymLinkInstance).target_path
-				processed_count += 1
-				if processed_count > next_tick
-					next_tick += onep
-					bar.inc if verbose == 1
-				end
+				sp.update 1 if verbose == 1
 			end
-			bar.done if verbose == 1
+
+			sp.done if verbose == 1
 		end
 
 		private def write_metadata
+			File.open("bogus.yml", "w") { |f| YAML.dump(self, f) }
 		end
 
 		private def check(name="", file_path="")
@@ -167,12 +180,10 @@ module FS
 					else
 						files[index] = Entity.new obj
 					end
-					files.count_inc
 				else
 					real_name = FileUtil.readlink(file_path)
 					obj = SymLinkInstance.new(file_path, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
 					symlinks["#{file_path}"] = Entity.new obj
-					symlinks.count_inc
 				end
 			else
 				# TODO non existent file... e.g. broken symlink
@@ -180,87 +191,17 @@ module FS
 			name
 		end
 
-		class Meta < Hash(String, Entity)
-			def initialize
-				super
-				@count = 0
+		def to_yaml(yaml : YAML::Generator)
+			yaml.nl
+			yaml << "symlinks:"
+			yaml.indented do
+				symlinks.to_yaml(yaml)
 			end
-
-			def count
-				@count
-			end
-
-			def count=(other)
-				@count = other
-			end
-
-			def count_inc
-				@count += 1
+			yaml << "files:"
+			yaml.indented do
+				files.to_yaml(yaml)
 			end
 		end
 
-		class Entity
-			def initialize(first_entry)
-				@entries = [first_entry as BackupableInstance]
-				@count = 1
-			end
-
-			def push(entry)
-				@entries << entry as BackupableInstance
-				@count += 1
-			end
-
-			def dump
-				entries.each do |entry|
-					puts "  - #{entry.to_s}"
-				end
-			end
-
-			def entries
-				@entries
-			end
-
-			def count
-				@count
-			end
-		end
-
-		class BackupableInstance
-			def initialize(file_path, perm, uid, gid)
-				@file_path = file_path
-				@file_perm = perm
-				@file_uid = uid
-				@file_gid = gid
-			end
-
-			def file_path
-				@file_path
-			end
-		end
-
-		class FileInstance < BackupableInstance
-			def initialize(file_path, perm, uid, gid)
-				super(file_path, perm, uid, gid)
-			end
-
-			def to_s
-				":#{@file_path}:#{@file_perm}:#{@file_uid}:#{@file_gid}"
-			end
-		end
-
-		class SymLinkInstance < BackupableInstance
-			def initialize(file_path, target_path, perm, uid, gid)
-				super(file_path, perm, uid, gid)
-				@target_path = target_path
-			end
-
-			def target_path
-				@target_path
-			end
-
-			def to_s
-				":#{@file_path}->#{@target_path}:#{@file_perm}:#{@file_uid}:#{@file_gid}"
-			end
-		end
 	end
 end

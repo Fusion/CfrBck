@@ -1,6 +1,7 @@
 module Util
   class SimpleProgress
     def initialize(total)
+      @total= total
       @onep = total / 100.0
       @onep = 1 if @onep < 1
       @next_tick = @onep
@@ -11,14 +12,16 @@ module Util
 
     def update(delta)
       @processed_count += delta
-      if @processed_count > @next_tick
-        @next_tick += @onep
-        @bar.inc
+      if @processed_count < @total
+        if @processed_count > @next_tick
+          @next_tick += @onep
+          @bar.inc
+        end
       end
     end
-  end
 
-  def done
-    @bar.done
+    def done
+      @bar.done
+    end
   end
 end
