@@ -36,6 +36,7 @@ module Cfrbck
 	start_dir = ""
 	output_dir = "bck"
 	ignore_dates = false
+	fingerprint = false
 	verbose_str = "1"
 	recheck_str = "1"
 	desired_action = Action::Undef
@@ -45,11 +46,12 @@ module Cfrbck
 	begin
 		OptionParser.parse! do |parser|
 			parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
-			parser.separator("\nA reasonably good compromise: -d -r 1\n")
+			parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n")
 			parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
 			parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
 			parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
 			parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
+			parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
 			parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
 			parser.on("-h", "--help") { proceed = false; puts parser }
 			parser.unknown_args do |arg|
@@ -94,6 +96,12 @@ module Cfrbck
 				end
 				traverser.set_ignore_dates
 			end
+			if fingerprint
+				if verbose > 1
+					puts "(generating fingerprints)"
+				end
+				traverser.set_fingerprint
+			end
 			if verbose > 1
 				puts "(recheck level = #{recheck_str})"
 			end
@@ -115,7 +123,7 @@ module Cfrbck
 			end
 
 			restorer.start
-			
+
 		end
 	end
 end

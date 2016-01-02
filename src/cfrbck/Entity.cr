@@ -1,14 +1,17 @@
 module FS
 	class Entity
-		getter entries
+		getter entries, fingerprint
 
 		enum Type
 			File
 			SymLink
 		end
 
-		def initialize(@entity_type, first_entry)
+		EmptyFingerprint = "."
+
+		def initialize(@entity_type, first_entry, fp = EmptyFingerprint)
 			@entries = [first_entry as BackupableInstance]
+			@fingerprint = fp
 		end
 
 		def push(entry)
@@ -21,6 +24,10 @@ module FS
 
 		def store_name=(name)
 			@store_name = name
+		end
+
+		def fingerprint=(fp)
+			@fingerprint = fp
 		end
 
 		def count
@@ -40,6 +47,8 @@ module FS
 				key.to_yaml(yaml)
 				yaml.nl("  store_name: ")
 				@store_name.to_yaml(yaml)
+				yaml.nl("  fingerprint: ")
+				@fingerprint.to_yaml(yaml)
 			when Type::SymLink
 				yaml.nl("- symlink: ")
 				key.to_yaml(yaml)

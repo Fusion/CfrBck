@@ -1,10 +1,11 @@
 require "dir"
 require "yaml"
+require "secure_random"
 require "progress"
 
 module FS
 	class Traverser
-		getter start_dir, output_dir, files, symlinks, ignore_dates, recheck, verbose
+		getter start_dir, output_dir, files, symlinks, ignore_dates, fingerprint, recheck, verbose
 
 		def initialize(start_dir, output_dir)
 			@start_dir = start_dir
@@ -13,6 +14,7 @@ module FS
 			@symlinks = Meta.new
 			@stored_items = {} of String => String
 			@ignore_dates = false
+			@fingerprint = false
 			@recheck = 1
 			@use_md5 = true
 			@verbose = 1
@@ -20,6 +22,10 @@ module FS
 
 		def set_ignore_dates
 			@ignore_dates = true
+		end
+
+		def set_fingerprint
+			@fingerprint = true
 		end
 
 		def recheck=(level)
@@ -88,6 +94,7 @@ module FS
 				end
 				puts "For #{key} original value: #{(value.entries.first as BackupableInstance).file_path}" if verbose > 2
 				reference_checksum = get_file_checksum((value.entries.first as BackupableInstance).file_path)
+				value.fingerprint = reference_checksum if fingerprint # patch with that fingerprint
 				iter = value.entries.each
 				new_array = [iter.next as BackupableInstance] # skip 1st entry
 				item = iter.next
@@ -99,7 +106,7 @@ module FS
 						if diff_files.has_key?(index)
 							diff_files[index].push item
 						else
-							diff_files[index] = Entity.new(Entity::Type::File, item)
+							diff_files[index] = Entity.new(Entity::Type::File, item, fingerprint ? file_checksum : Entity::EmptyFingerprint)
 						end
 						puts "          Fake Dup: #{reference_checksum} (#{(value.entries.first as BackupableInstance).file_path}) v. #{file_checksum} (#{(item as BackupableInstance).file_path})" if verbose > 2
 					else
@@ -123,25 +130,28 @@ module FS
 				math.checksum(file_path, LocalCrypto::Algorithm::MD5)
 		end
 
-		# TODO If I used actual unique ids, then I could run multiple backups
+		# Using actual unique ids, so that I could run multiple backups
 		# in parallel with same output directory
 		# Alternatively I could start threading this code.
 		private def write_files
 			files_count = files.count
 			puts "Copying #{files.size} unique files (for a total of #{files_count} file nodes)..." if verbose > 0
 
-			uniqueid = 0
-
 			sp = Util::SimpleProgress.new files_count
 
 			files.each do |key, value|
+				uniqueid = SecureRandom.uuid
 				store_name = uniqueid.to_s
-				uniqueid += 1
+
 				# we are going to store first file, regardless
 				# of list size
 				item = value.entries.first.file_path
 				value.store_name = store_name
 				FileUtil.copy(item, File.join(output_dir, store_name))
+				# fix fingerprint for files that do not have that computed yet
+				if fingerprint && value.fingerprint == Entity::EmptyFingerprint
+					value.fingerprint = get_file_checksum(item)
+				end
 				sp.update value.count if verbose == 1
 			end
 
