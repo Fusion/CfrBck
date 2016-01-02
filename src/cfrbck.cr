@@ -27,7 +27,7 @@ require "option_parser"
 require "./cfrbck/*"
 
 module Cfrbck
-	start_dir = "."
+	start_dir = ""
 	output_dir = "bck"
 	ignore_dates = false
 	verbose_str = "1"
@@ -44,6 +44,11 @@ module Cfrbck
 		parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
 		parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
 		parser.on("-h", "--help") { proceed = false; puts parser }
+	end
+
+	if start_dir == ""
+		proceed = false
+		puts "Usage information: cfrbck -h"
 	end
 
 	if proceed

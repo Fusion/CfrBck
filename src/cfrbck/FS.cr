@@ -162,7 +162,7 @@ module FS
 		end
 
 		private def write_metadata
-			File.open("bogus.yml", "w") { |f| YAML.dump(self, f) }
+			File.open(File.join(output_dir, "catalog.yml"), "w") { |f| YAML.dump(self, f) }
 		end
 
 		private def check(name="", file_path="")
@@ -197,6 +197,7 @@ module FS
 			yaml.indented do
 				symlinks.to_yaml(yaml)
 			end
+			yaml.nl
 			yaml << "files:"
 			yaml.indented do
 				files.to_yaml(yaml)

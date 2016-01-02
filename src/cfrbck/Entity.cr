@@ -1,15 +1,13 @@
 module FS
 	class Entity
+		getter entries
+
 		def initialize(first_entry)
 			@entries = [first_entry as BackupableInstance]
 		end
 
 		def push(entry)
 			@entries << entry as BackupableInstance
-		end
-
-		def entries
-			@entries
 		end
 
 		def entries=(values)

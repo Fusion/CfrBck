@@ -1,14 +1,12 @@
 module FS
 	class BackupableInstance
+		getter file_path
+
 		def initialize(file_path, perm, uid, gid)
 			@file_path = file_path
 			@file_perm = perm
 			@file_uid = uid
 			@file_gid = gid
-		end
-
-		def file_path
-			@file_path
 		end
 
 		def to_yaml(yaml : YAML::Generator)
@@ -44,13 +42,11 @@ module FS
 	end
 
 	class SymLinkInstance < BackupableInstance
+		getter target_path
+
 		def initialize(file_path, target_path, perm, uid, gid)
 			super(file_path, perm, uid, gid)
 			@target_path = target_path
-		end
-
-		def target_path
-			@target_path
 		end
 
 		def to_s
