@@ -4,7 +4,6 @@ require "progress"
 
 module FS
 	class Traverser
-
 		getter start_dir, output_dir, files, symlinks, ignore_dates, recheck, verbose
 
 		def initialize(start_dir, output_dir)
@@ -15,6 +14,7 @@ module FS
 			@stored_items = {} of String => String
 			@ignore_dates = false
 			@recheck = 1
+			@use_md5 = true
 			@verbose = 1
 		end
 
@@ -86,26 +86,25 @@ module FS
 				if value.entries.size < 2
 					next
 				end
-				#puts "For #{key} original value: #{(value.entries.first as BackupableInstance).file_path}"
+				puts "For #{key} original value: #{(value.entries.first as BackupableInstance).file_path}" if verbose > 2
 				reference_checksum = get_file_checksum((value.entries.first as BackupableInstance).file_path)
 				iter = value.entries.each
 				new_array = [iter.next as BackupableInstance] # skip 1st entry
 				item = iter.next
 				until item == Iterator::Stop::INSTANCE
-					#puts "           found potential dup: #{(item as BackupableInstance).file_path}"
+					puts "          found potential dup: #{(item as BackupableInstance).file_path}" if verbose > 2
 					file_checksum = get_file_checksum((item as BackupableInstance).file_path)
 					if file_checksum != reference_checksum
 						index = file_checksum + "::" + key
 						if diff_files.has_key?(index)
 							diff_files[index].push item
 						else
-							diff_files[index] = Entity.new item
+							diff_files[index] = Entity.new(Entity::Type::File, item)
 						end
-						#puts "*** In fact, it WAS a fake dup!"
+						puts "          Fake Dup: #{reference_checksum} (#{(value.entries.first as BackupableInstance).file_path}) v. #{file_checksum} (#{(item as BackupableInstance).file_path})" if verbose > 2
 					else
 						new_array << item as BackupableInstance
-						# noop
-						#puts "+cool: #{reference_checksum} (#{(value.entries.first as BackupableInstance).file_path}) v. #{file_checksum} (#{(item as BackupableInstance).file_path})"
+						puts "          Confirmed Dup: #{reference_checksum} (#{(value.entries.first as BackupableInstance).file_path}) v. #{file_checksum} (#{(item as BackupableInstance).file_path})" if verbose > 2
 					end
 					item  = iter.next
 				end
@@ -121,7 +120,7 @@ module FS
 
 		private def get_file_checksum(file_path)
 				math = FileUtil::Math.new
-				math.checksum(file_path)
+				math.checksum(file_path, LocalCrypto::Algorithm::MD5)
 		end
 
 		# TODO If I used actual unique ids, then I could run multiple backups
@@ -136,12 +135,13 @@ module FS
 			sp = Util::SimpleProgress.new files_count
 
 			files.each do |key, value|
-				index = uniqueid.to_s
+				store_name = uniqueid.to_s
 				uniqueid += 1
 				# we are going to store first file, regardless
 				# of list size
 				item = value.entries.first.file_path
-				FileUtil.copy(item, File.join(output_dir, uniqueid.to_s))
+				value.store_name = store_name
+				FileUtil.copy(item, File.join(output_dir, store_name))
 				sp.update value.count if verbose == 1
 			end
 
@@ -178,12 +178,12 @@ module FS
 					if files.has_key?(index)
 						files[index].push obj
 					else
-						files[index] = Entity.new obj
+						files[index] = Entity.new(Entity::Type::File, obj)
 					end
 				else
 					real_name = FileUtil.readlink(file_path)
 					obj = SymLinkInstance.new(file_path, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
-					symlinks["#{file_path}"] = Entity.new obj
+					symlinks["#{file_path}"] = Entity.new(Entity::Type::SymLink, obj)
 				end
 			else
 				# TODO non existent file... e.g. broken symlink

@@ -27,12 +27,18 @@ require "option_parser"
 require "./cfrbck/*"
 
 module Cfrbck
+	enum Action
+		Undef
+		Backup
+		Restore
+	end
+
 	start_dir = ""
 	output_dir = "bck"
 	ignore_dates = false
 	verbose_str = "1"
 	recheck_str = "1"
-	action = ""
+	desired_action = Action::Undef
 
 	proceed = true
 
@@ -46,7 +52,15 @@ module Cfrbck
 			parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
 			parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
 			parser.on("-h", "--help") { proceed = false; puts parser }
-			parser.unknown_args {|arg| action = arg}
+			parser.unknown_args do |arg|
+				if arg.size > 0
+					if arg[0] == "backup"
+						desired_action = Action::Backup
+					elsif arg[0] == "restore"
+						desired_action = Action::Restore
+					end
+				end
+			end
 		end
 	rescue ex: OptionParser::InvalidOption
 		proceed = false
@@ -57,7 +71,8 @@ module Cfrbck
 		if start_dir == ""
 			proceed = false
 			puts "Usage information: cfrbck -h"
-		elsif action != "backup" && action != "restore"
+		elsif desired_action == Action::Undef
+			puts desired_action.value
 			proceed = false
 			puts "Possible actions: backup|restore"
 		end
@@ -67,28 +82,40 @@ module Cfrbck
 		verbose = verbose_str.to_i
 		recheck = recheck_str.to_i
 
-		traverser = FS::Traverser.new(start_dir, output_dir)
-		if verbose > 1
-			puts "(verbose output level: #{verbose})"
-			traverser.verbose = verbose
-		end
-		if ignore_dates
+		if desired_action == Action::Backup
+			traverser = FS::Traverser.new(start_dir, output_dir)
 			if verbose > 1
-				puts "(ignoring dates)"
+				puts "(verbose output level: #{verbose})"
+				traverser.verbose = verbose
 			end
-			traverser.set_ignore_dates
-		end
-		if verbose > 1
-			puts "(recheck level = #{recheck_str})"
-		end
-		traverser.recheck = recheck
-		if verbose > 0
-			puts "start_dir  = #{start_dir}"
-			puts "output_dir = #{output_dir}"
-		end
+			if ignore_dates
+				if verbose > 1
+					puts "(ignoring dates)"
+				end
+				traverser.set_ignore_dates
+			end
+			if verbose > 1
+				puts "(recheck level = #{recheck_str})"
+			end
+			traverser.recheck = recheck
+			if verbose > 0
+				puts "start_dir  = #{start_dir}"
+				puts "output_dir = #{output_dir}"
+			end
 
-		traverser.prepare
-		traverser.start
-		traverser.dump_entities if verbose > 2
+			traverser.prepare
+			traverser.start
+			traverser.dump_entities if verbose > 2
+
+		else # RESTORE
+			restorer = FS::Restorer.new(start_dir, output_dir)
+			if verbose > 1
+				puts "(verbose output level: #{verbose})"
+				restorer.verbose = verbose
+			end
+
+			restorer.start
+			
+		end
 	end
 end

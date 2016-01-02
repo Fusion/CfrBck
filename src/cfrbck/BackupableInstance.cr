@@ -2,11 +2,7 @@ module FS
 	class BackupableInstance
 		getter file_path
 
-		def initialize(file_path, perm, uid, gid)
-			@file_path = file_path
-			@file_perm = perm
-			@file_uid = uid
-			@file_gid = gid
+		def initialize(@file_path, @file_perm, @file_uid, @file_gid)
 		end
 
 		def to_yaml(yaml : YAML::Generator)
@@ -28,9 +24,7 @@ module FS
 		end
 
 		def to_yaml(key, yaml : YAML::Generator)
-			yaml.nl("- file: ")
-			key.to_yaml(yaml)
-			yaml.nl("  instance_path: ")
+			yaml.nl("- instance_path: ")
 			@file_path.to_yaml(yaml)
 			yaml.nl("  perm: ")
 			@file_perm.to_yaml(yaml)
@@ -44,9 +38,8 @@ module FS
 	class SymLinkInstance < BackupableInstance
 		getter target_path
 
-		def initialize(file_path, target_path, perm, uid, gid)
+		def initialize(file_path, @target_path, perm, uid, gid)
 			super(file_path, perm, uid, gid)
-			@target_path = target_path
 		end
 
 		def to_s
@@ -54,9 +47,7 @@ module FS
 		end
 
 		def to_yaml(key, yaml : YAML::Generator)
-			yaml.nl("- symlink: ")
-			key.to_yaml(yaml)
-			yaml.nl("  target_path: ")
+			yaml.nl("- target_path: ")
 			@target_path.to_yaml(yaml)
 			yaml.nl("  perm: ")
 			@file_perm.to_yaml(yaml)
