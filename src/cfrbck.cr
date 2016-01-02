@@ -32,23 +32,35 @@ module Cfrbck
 	ignore_dates = false
 	verbose_str = "1"
 	recheck_str = "1"
+	action = ""
 
 	proceed = true
 
-	OptionParser.parse! do |parser|
-		parser.banner = "Usage: cfrbck [option 1] ... [option n]"
-		parser.separator("\nA reasonably good compromise: -d -r 1\n")
-		parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
-		parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
-		parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
-		parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
-		parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
-		parser.on("-h", "--help") { proceed = false; puts parser }
+	begin
+		OptionParser.parse! do |parser|
+			parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
+			parser.separator("\nA reasonably good compromise: -d -r 1\n")
+			parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
+			parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
+			parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
+			parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
+			parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
+			parser.on("-h", "--help") { proceed = false; puts parser }
+			parser.unknown_args {|arg| action = arg}
+		end
+	rescue ex: OptionParser::InvalidOption
+		proceed = false
+		puts "#{ex}"
 	end
 
-	if start_dir == ""
-		proceed = false
-		puts "Usage information: cfrbck -h"
+	if proceed
+		if start_dir == ""
+			proceed = false
+			puts "Usage information: cfrbck -h"
+		elsif action != "backup" && action != "restore"
+			proceed = false
+			puts "Possible actions: backup|restore"
+		end
 	end
 
 	if proceed
