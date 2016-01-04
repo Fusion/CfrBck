@@ -27,103 +27,103 @@ require "option_parser"
 require "./cfrbck/*"
 
 module Cfrbck
-	enum Action
-		Undef
-		Backup
-		Restore
-	end
+  enum Action
+    Undef
+    Backup
+    Restore
+  end
 
-	start_dir = ""
-	output_dir = "bck"
-	ignore_dates = false
-	fingerprint = false
-	verbose_str = "1"
-	recheck_str = "1"
-	desired_action = Action::Undef
+  start_dir = ""
+  output_dir = "bck"
+  ignore_dates = false
+  fingerprint = false
+  verbose_str = "1"
+  recheck_str = "1"
+  desired_action = Action::Undef
 
-	proceed = true
+  proceed = true
 
-	begin
-		OptionParser.parse! do |parser|
-			parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
-			parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n")
-			parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
-			parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
-			parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
-			parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
-			parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
-			parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
-			parser.on("-h", "--help") { proceed = false; puts parser }
-			parser.unknown_args do |arg|
-				if arg.size > 0
-					if arg[0] == "backup"
-						desired_action = Action::Backup
-					elsif arg[0] == "restore"
-						desired_action = Action::Restore
-					end
-				end
-			end
-		end
-	rescue ex: OptionParser::InvalidOption
-		proceed = false
-		puts "#{ex}"
-	end
+  begin
+    OptionParser.parse! do |parser|
+      parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
+      parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n")
+      parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
+      parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
+      parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
+      parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
+      parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
+      parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
+      parser.on("-h", "--help") { proceed = false; puts parser }
+      parser.unknown_args do |arg|
+        if arg.size > 0
+          if arg[0] == "backup"
+            desired_action = Action::Backup
+          elsif arg[0] == "restore"
+            desired_action = Action::Restore
+          end
+        end
+      end
+    end
+  rescue ex: OptionParser::InvalidOption
+    proceed = false
+    puts "#{ex}"
+  end
 
-	if proceed
-		if start_dir == ""
-			proceed = false
-			puts "Usage information: cfrbck -h"
-		elsif desired_action == Action::Undef
-			puts desired_action.value
-			proceed = false
-			puts "Possible actions: backup|restore"
-		end
-	end
+  if proceed
+    if start_dir == ""
+      proceed = false
+      puts "Usage information: cfrbck -h"
+    elsif desired_action == Action::Undef
+      puts desired_action.value
+      proceed = false
+      puts "Possible actions: backup|restore"
+    end
+  end
 
-	if proceed
-		verbose = verbose_str.to_i
-		recheck = recheck_str.to_i
+  if proceed
+    verbose = verbose_str.to_i
+    recheck = recheck_str.to_i
 
-		if desired_action == Action::Backup
-			traverser = FS::Traverser.new(start_dir, output_dir)
-			if verbose > 1
-				puts "(verbose output level: #{verbose})"
-				traverser.verbose = verbose
-			end
-			if ignore_dates
-				if verbose > 1
-					puts "(ignoring dates)"
-				end
-				traverser.set_ignore_dates
-			end
-			if fingerprint
-				if verbose > 1
-					puts "(generating fingerprints)"
-				end
-				traverser.set_fingerprint
-			end
-			if verbose > 1
-				puts "(recheck level = #{recheck_str})"
-			end
-			traverser.recheck = recheck
-			if verbose > 0
-				puts "start_dir  = #{start_dir}"
-				puts "output_dir = #{output_dir}"
-			end
+    if desired_action == Action::Backup
+      traverser = FS::Traverser.new(start_dir, output_dir)
+      if verbose > 1
+        puts "(verbose output level: #{verbose})"
+        traverser.verbose = verbose
+      end
+      if ignore_dates
+        if verbose > 1
+          puts "(ignoring dates)"
+        end
+        traverser.set_ignore_dates
+      end
+      if fingerprint
+        if verbose > 1
+          puts "(generating fingerprints)"
+        end
+        traverser.set_fingerprint
+      end
+      if verbose > 1
+        puts "(recheck level = #{recheck_str})"
+      end
+      traverser.recheck = recheck
+      if verbose > 0
+        puts "start_dir  = #{start_dir}"
+        puts "output_dir = #{output_dir}"
+      end
 
-			traverser.prepare
-			traverser.start
-			traverser.dump_entities if verbose > 2
+      traverser.prepare
+      traverser.start
+      traverser.dump_entities if verbose > 2
 
-		else # RESTORE
-			restorer = FS::Restorer.new(start_dir, output_dir)
-			if verbose > 1
-				puts "(verbose output level: #{verbose})"
-				restorer.verbose = verbose
-			end
+    else # RESTORE
+      restorer = FS::Restorer.new(start_dir, output_dir)
+      if verbose > 1
+        puts "(verbose output level: #{verbose})"
+        restorer.verbose = verbose
+      end
 
-			restorer.start
+      restorer.start
 
-		end
-	end
+    end
+  end
 end
