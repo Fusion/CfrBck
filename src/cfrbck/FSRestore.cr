@@ -2,9 +2,7 @@ module FS
   class Restorer
     getter start_dir, output_dir, verbose
 
-    def initialize(start_dir, output_dir)
-      @start_dir = start_dir
-      @output_dir = output_dir
+    def initialize(@start_dir, @output_dir)
       @verbose = 1
     end
 

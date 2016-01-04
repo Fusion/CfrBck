@@ -10,8 +10,8 @@ module FS
 		EmptyFingerprint = "."
 
 		def initialize(@entity_type, first_entry, fp = EmptyFingerprint)
-			@entries = [first_entry as BackupableInstance]
-			@fingerprint = fp
+      @entries     = [first_entry as BackupableInstance]
+      @fingerprint = fp
 		end
 
 		def push(entry)
@@ -24,6 +24,10 @@ module FS
 
 		def store_name=(name)
 			@store_name = name
+		end
+
+		def ts=(timestamp)
+			@ts = timestamp
 		end
 
 		def fingerprint=(fp)

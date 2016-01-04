@@ -7,17 +7,15 @@ module FS
 	class Traverser
 		getter start_dir, output_dir, files, symlinks, ignore_dates, fingerprint, recheck, verbose
 
-		def initialize(start_dir, output_dir)
-			@start_dir = start_dir
-			@output_dir = output_dir
-			@files = Meta.new
-			@symlinks = Meta.new
-			@stored_items = {} of String => String
-			@ignore_dates = false
-			@fingerprint = false
-			@recheck = 1
-			@use_md5 = true
-			@verbose = 1
+		def initialize(@start_dir, @output_dir)
+      @files        = Meta.new
+      @symlinks     = Meta.new
+      @stored_items = {} of String => String
+      @ignore_dates = false
+      @fingerprint  = false
+      @recheck      = 1
+      @use_md5      = true
+      @verbose      = 1
 		end
 
 		def set_ignore_dates
@@ -178,13 +176,17 @@ module FS
 		private def check(name="", file_path="")
 			if File.exists?(file_path)
 				f_stat = File.lstat(file_path)
+				# NOTE: mtime is what we are after. ctime would be modified in more situations
+				# but we store files' attributes anyway. This may change down the road
+				# when performing incremental backups as inode change may be relevant.
 				if ! f_stat.symlink?
+					mtime_str = f_stat.mtime.epoch.to_s
 					if ignore_dates
 						index = f_stat.size.to_s + "::*::" + name
 					else
-						index = f_stat.size.to_s + "::" + f_stat.mtime.to_s + "::" + name
+						index = f_stat.size.to_s + "::" + mtime_str + "::" + name
 					end
-					obj = FileInstance.new(file_path, f_stat.perm, f_stat.uid, f_stat.gid)
+					obj = FileInstance.new(file_path, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
 					if files.has_key?(index)
 						files[index].push obj
 					else

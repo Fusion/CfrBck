@@ -15,7 +15,7 @@ module FS
 	end
 
 	class FileInstance < BackupableInstance
-		def initialize(file_path, perm, uid, gid)
+		def initialize(file_path, @mtime, perm, uid, gid)
 			super(file_path, perm, uid, gid)
 		end
 
@@ -26,6 +26,8 @@ module FS
 		def to_yaml(key, yaml : YAML::Generator)
 			yaml.nl("- instance_path: ")
 			@file_path.to_yaml(yaml)
+			yaml.nl("  mtime: ")
+			@mtime.to_yaml(yaml)
 			yaml.nl("  perm: ")
 			@file_perm.to_yaml(yaml)
 			yaml.nl("  uid: ")
