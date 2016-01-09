@@ -22,6 +22,15 @@
 # 3.a. make a db note of uniqueid -> index(filename, etc) -> instances
 # 3.b. make a db note of index(filename, etc) -> uniqueid -> instances
 # 4. store metadata for future retrieval
+#
+# TODO
+# - Restore!!!
+# - Multiple roots
+# - Excludes
+# - Incremental backups
+#   - New files
+#   - Deleted files
+#   - Updated files
 
 require "option_parser"
 require "./cfrbck/*"

@@ -3,6 +3,7 @@ module FS
     getter entries, fingerprint
 
     enum Type
+      Directory
       File
       SymLink
     end
@@ -46,6 +47,9 @@ module FS
 
     def to_yaml(key, yaml : YAML::Generator)
       case @entity_type
+      when Type::Directory
+        yaml.nl("- dn: ")
+        key.to_yaml(yaml)
       when Type::File
         yaml.nl("- dn: ")
         key.to_yaml(yaml)

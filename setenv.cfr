@@ -1,1 +1,2 @@
 export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/lib"
+export CRYSTAL_PATH=/usr/local/Cellar/crystal-lang/0.10.0/src:libs

@@ -5,9 +5,10 @@ require "progress"
 
 module FS
   class Traverser
-    getter start_dir, output_dir, files, symlinks, ignore_dates, fingerprint, recheck, verbose
+    getter start_dir, output_dir, hierarchy, files, symlinks, ignore_dates, fingerprint, recheck, verbose
 
     def initialize(@start_dir, @output_dir)
+      @hierarchy    = Meta.new
       @files        = Meta.new
       @symlinks     = Meta.new
       @stored_items = {} of String => String
@@ -35,6 +36,10 @@ module FS
     end
 
     def dump_entities
+      puts "* Dumping hierarchy:"
+      hierarchy.each do |key, value|
+        puts "+ #{key}:#{value}"
+      end
       puts "* Dumping content of files:"
       files.each do |key, value|
         puts "+ #{key}:"
@@ -60,6 +65,7 @@ module FS
         recheck_run_dir(recheck)
       end
 
+      write_hierarchy
       write_files
       write_symlinks
       write_metadata
@@ -69,17 +75,22 @@ module FS
 
     private def run_dir(depth, dir_name)
       d = Dir.new dir_name
+      this_dir_has_children = false
       d.each do |fe|
         next if fe == "." || fe == ".."
         fe_path = File.join(dir_name, fe.to_s)
         padding = " " * depth
         if File.directory?(fe_path)
           puts "#{padding}[#{fe}]" if verbose > 1
+          this_dir_has_children = true
           run_dir(depth+1,fe_path)
         else
-          res = check name: fe.to_s, file_path: fe_path
+          res = check_file name: fe.to_s, file_path: fe_path
           puts "#{padding}#{res}" if verbose > 1
         end
+      end
+      if this_dir_has_children == false
+        check_dir name: dir_name, dir_path: dir_name
       end
     end
 
@@ -156,6 +167,20 @@ module FS
       sp.done if verbose == 1
     end
 
+    # noop
+    private def write_hierarchy
+      puts "Memorizing #{hierarchy.size} directories..." if verbose > 0
+
+      sp = Util::SimpleProgress.new hierarchy.size
+
+      hierarchy.each do |key, value|
+        sp.update value.count if verbose == 1
+      end
+
+      sp.done if verbose == 1
+    end
+
+    # noop
     private def write_symlinks
       puts "Storing #{symlinks.size} symbolink links..." if verbose > 0
 
@@ -173,7 +198,7 @@ module FS
       File.open(File.join(output_dir, "catalog.yml"), "w") { |f| YAML.dump(self, f) }
     end
 
-    private def check(name="", file_path="")
+    private def check_file(name="", file_path="")
       if File.exists?(file_path)
         f_stat = File.lstat(file_path)
         # NOTE: mtime is what we are after. ctime would be modified in more situations
@@ -203,6 +228,16 @@ module FS
       name
     end
 
+    private def check_dir(name="", dir_path="")
+      if File.exists?(dir_path)
+        f_stat = File.lstat(dir_path)
+        mtime_str = f_stat.mtime.epoch.to_s
+        obj = FileInstance.new(dir_path, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
+        hierarchy["#{dir_path}"] = Entity.new(Entity::Type::Directory, obj)
+      end
+      name
+    end
+
     def to_yaml(yaml : YAML::Generator)
       yaml.nl
       yaml << "symlinks:"
@@ -213,6 +248,11 @@ module FS
       yaml << "files:"
       yaml.indented do
         files.to_yaml(yaml)
+      end
+      yaml.nl
+      yaml << "hierarchy:"
+      yaml.indented do
+        hierarchy.to_yaml(yaml)
       end
     end
 
