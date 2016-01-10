@@ -1,5 +1,8 @@
 lib LibC
   fun readlink(filename: Char*, buffer: Char*, size: Int): Int
+  fun symlink(target: Char*, link_path: Char*): Int
+  fun chown(filename: Char*, owner: Int, group: Int): Int
+  fun chmod(filename: Char*, mode: Int): Int
 end
 
 require "file"
@@ -30,6 +33,24 @@ module FileUtil extend self
     target_path_ptr = Pointer(UInt8).malloc(1025)
     read_count = LibC.readlink(link_path, target_path_ptr, 1024)
     String.new(target_path_ptr, read_count)
+  end
+
+  def symlink(target, link_path, force = false)
+    if 0 != LibC.symlink(target, link_path)
+      raise "Unable to create symbolic link #{target} for #{link_path}" unless force
+    end
+  end
+
+  def chown(file_path, owner, group, force = false)
+    if 0 != LibC.chown(file_path, owner, group)
+      raise "Unable to change ownerhsip to #{owner}:#{group} for file #{file_path}" unless force
+    end
+  end
+
+  def chmod(file_path, mode, force = false)
+    if 0 != LibC.chmod(file_path, mode)
+      raise "Unable to change mode to #{mode} for file #{file_path}" unless force
+    end
   end
 
   def canonical_path(path)

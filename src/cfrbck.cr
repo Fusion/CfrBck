@@ -24,6 +24,7 @@
 # 4. store metadata for future retrieval
 #
 # TODO
+# - A shameful limitation: due to optimization, dirs ownership etc not preserved
 # - Restore!!!
 # - Multiple roots
 # - Excludes
@@ -42,12 +43,13 @@ module Cfrbck
     Restore
   end
 
-  start_dir = ""
-  output_dir = ""
-  ignore_dates = false
-  fingerprint = false
-  verbose_str = "1"
-  recheck_str = "1"
+  start_dir      = ""
+  output_dir     = ""
+  ignore_dates   = false
+  fingerprint    = false
+  force          = false
+  verbose_str    = "1"
+  recheck_str    = "1"
   desired_action = Action::Undef
 
   proceed = true
@@ -61,6 +63,7 @@ module Cfrbck
       parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
       parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
       parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
+      parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
       parser.on("-h", "--help") { proceed = false; puts parser }
       parser.unknown_args do |arg|
@@ -135,6 +138,12 @@ module Cfrbck
       if verbose > 1
         puts "(verbose output level: #{verbose})"
         restorer.verbose = verbose
+      end
+      if force
+        if verbose > 1
+          puts "(force continue)"
+        end
+        restorer.set_force
       end
 
       restorer.prepare

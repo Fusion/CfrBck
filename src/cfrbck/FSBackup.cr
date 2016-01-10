@@ -222,7 +222,9 @@ module FS
         else
           real_name = FileUtil.readlink(file_path)
           obj = SymLinkInstance.new(file_path, @start_dir, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
-          symlinks["#{file_path}"] = Entity.new(Entity::Type::SymLink, obj)
+          entity = Entity.new(Entity::Type::SymLink, obj)
+          entity.root = @start_dir
+          symlinks["#{file_path}"] = entity
         end
       else
         # TODO non existent file... e.g. broken symlink

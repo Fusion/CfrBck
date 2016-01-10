@@ -35,6 +35,10 @@ module FS
       @fingerprint = fp
     end
 
+    def root=(root)
+      @root = root
+    end
+
     def count
       @entries.size
     end
@@ -60,6 +64,8 @@ module FS
       when Type::SymLink
         yaml.nl("- symlink: ")
         key.to_yaml(yaml)
+        yaml.nl("  root: ")
+        @root.to_yaml(yaml)
       end
       yaml.indented do
         yaml.nl
