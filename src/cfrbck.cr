@@ -43,7 +43,7 @@ module Cfrbck
   end
 
   start_dir = ""
-  output_dir = "bck"
+  output_dir = ""
   ignore_dates = false
   fingerprint = false
   verbose_str = "1"
@@ -55,7 +55,7 @@ module Cfrbck
   begin
     OptionParser.parse! do |parser|
       parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
-      parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n")
+      parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n\nExamples:\n\ncfrbck -d -r 1 -p -s test backup\ncfrbck -d -r 1 -s bck -o rst restore\n")
       parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
       parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
       parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
@@ -66,8 +66,14 @@ module Cfrbck
       parser.unknown_args do |arg|
         if arg.size > 0
           if arg[0] == "backup"
+            if output_dir == ""
+              output_dir = "bck"
+            end
             desired_action = Action::Backup
           elsif arg[0] == "restore"
+            if output_dir == ""
+              output_dir = "rst"
+            end
             desired_action = Action::Restore
           end
         end
@@ -131,6 +137,7 @@ module Cfrbck
         restorer.verbose = verbose
       end
 
+      restorer.prepare
       restorer.start
 
     end

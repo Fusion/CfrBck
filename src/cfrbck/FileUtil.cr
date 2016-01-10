@@ -32,6 +32,18 @@ module FileUtil extend self
     String.new(target_path_ptr, read_count)
   end
 
+  def canonical_path(path)
+    File.expand_path(path)
+  end
+
+  def normalized_path(canon, path)
+    canonp = File.join(canon, "")
+    if !path.starts_with? canon
+      raise "Attempt to normalize [#{path}] based on [#{canonp}] is not legal."
+    end
+    path.sub(canonp, "")
+  end
+
   class Math
     def initialize
       #

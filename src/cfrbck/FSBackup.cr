@@ -7,7 +7,9 @@ module FS
   class Traverser
     getter start_dir, output_dir, hierarchy, files, symlinks, ignore_dates, fingerprint, recheck, verbose
 
-    def initialize(@start_dir, @output_dir)
+    def initialize(start_dir, output_dir)
+      @start_dir    = FileUtil.canonical_path(start_dir)
+      @output_dir   = FileUtil.canonical_path(output_dir)
       @hierarchy    = Meta.new
       @files        = Meta.new
       @symlinks     = Meta.new
@@ -211,7 +213,7 @@ module FS
           else
             index = f_stat.size.to_s + "::" + mtime_str + "::" + name
           end
-          obj = FileInstance.new(file_path, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
+          obj = FileInstance.new(file_path, @start_dir, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
           if files.has_key?(index)
             files[index].push obj
           else
@@ -219,7 +221,7 @@ module FS
           end
         else
           real_name = FileUtil.readlink(file_path)
-          obj = SymLinkInstance.new(file_path, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
+          obj = SymLinkInstance.new(file_path, @start_dir, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
           symlinks["#{file_path}"] = Entity.new(Entity::Type::SymLink, obj)
         end
       else
@@ -232,7 +234,7 @@ module FS
       if File.exists?(dir_path)
         f_stat = File.lstat(dir_path)
         mtime_str = f_stat.mtime.epoch.to_s
-        obj = FileInstance.new(dir_path, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
+        obj = FileInstance.new(dir_path, @start_dir, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
         hierarchy["#{dir_path}"] = Entity.new(Entity::Type::Directory, obj)
       end
       name

@@ -2,8 +2,10 @@ module FS
   class Restorer
     getter start_dir, output_dir, verbose
 
-    def initialize(@start_dir, @output_dir)
-      @verbose = 1
+    def initialize(start_dir, output_dir)
+      @start_dir    = FileUtil.canonical_path(start_dir)
+      @output_dir   = FileUtil.canonical_path(output_dir)
+      @verbose      = 1
     end
 
     def verbose=(level)
@@ -18,10 +20,26 @@ module FS
 
     def start
       catalog = read_metadata
-      files    = (catalog as Hash)["files"]
-      symlinks = (catalog as Hash)["symlinks"]
+      hierarchy = (catalog as Hash)["hierarchy"] as Array
+      files     = (catalog as Hash)["files"]
+      symlinks  = (catalog as Hash)["symlinks"]
+      write_hierarchy(hierarchy)
       write_files(files)
       write_symlinks(symlinks)
+    end
+
+    def write_hierarchy(hierarchy)
+      hierarchy.each do |entry|
+        ((entry as Hash)["instances"] as Array).each do |instance|
+          dir_path = File.join(output_dir,
+              FileUtil.normalized_path(
+                  (instance as Hash)["root"] as String,
+                  (instance as Hash)["instance_path"] as String))
+          if !File.exists?(dir_path)
+            Dir.mkdir_p(dir_path, ((instance as Hash)["perm"] as String).to_i)
+          end
+        end
+      end
     end
 
     def write_files(files)
