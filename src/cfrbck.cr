@@ -68,7 +68,7 @@ module Cfrbck
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }
       parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
-      parser.on("-h", "--help") { proceed = false; puts parser }
+      parser.on("-h", "--help", "Display this text") { proceed = false; puts parser }
       parser.unknown_args do |arg|
         if arg.size > 0
           if arg[0] == "backup"

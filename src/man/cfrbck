@@ -1,0 +1,81 @@
+.\" Manpage for cfrbck.
+.\" Contact chris@voilaweb.com to correct errors or typos.
+.TH cfrbck 8 "15 Jan 2015" "0.1.0" "cfrbck man page"
+.\" ------
+.SH NAME
+cfrbck \- incremental, dedupped backups
+.\" ------
+.SH SYNOPSIS
+cfrbck [options] <action>
+.SH DESCRIPTION
+cfrbck can be used to generate slimmer backups and restore them, especially when
+many file duplicates are expected. This is a typical use case of container servers.
+.\" ------
+.SH ACTIONS
+.TP
+.BR "backup\ " \fR
+Backup files. Supported options: -s, -o, -d, -r, -p, -x, --dry-run, -v
+.TP
+.BR "restore\ " \fR
+Restore files. Supported options: -s, -o, -f, --dry-run, -v
+.\" ------
+.SH OPTIONS
+.TP
+.BR "\-s dir, \-\-start=dir" \fR
+Backup source directory.
+In future releases, it will be possible to select more than one.
+.TP
+.BR "\-o dir, \-\-output=dir" \fR
+Backup output/destination directory.
+.TP
+.BR "\-d, \-\-ignore\-dates" \fR
+Do not use file dates when checking for duplicates.
+.TP
+.BR "\-r level, \-\-recheck=level" \fR
+Verify that files with similar characteristics are actually duplicates.
+.br
+.BR "level 0\fR do not verify"
+.br
+.BR "level 1\fR compare file hashes (recommended)"
+.br
+.BR "level 2\fR full compare (not implemented yet)"
+.TP
+.BR "\-p, \-\-fingerprint" \fR
+Store file fingerprint. Important for incremental backups.
+.TP
+.BR "\-x pattern, \-\-exclude=pattern" \fR
+Exclude file paths matching regex pattern. Quotes are recommended.
+.br
+This option can be used multiple times to specify more than one pattern.
+.br
+Example: -x '/*\/etc/'
+.TP
+.BR "\-f, \-\-force" \fR
+Force restore to continue even if some errors were found.
+.br
+Necessary to ignore overwriting existing files.
+.TP
+.BR "\-\-dry\-run" \fR
+Go through the motions but do not really backup or restore data.
+.br
+A convenient way to preview the program's actions.
+.TP
+.BR "\-v level, \-\-verbose=level" \fR
+Display level of verbosity.
+.br
+.BR "level 0\fR be completely quiet"
+.br
+.BR "level 1\fR normal feedback, progress bars (default)"
+.br
+.BR "level 2\fR show names of files being handled and hierarchy"
+.br
+.BR "level 3+\fR display debug information"
+.TP
+.BR "\-h, \-\-help" \fR
+Display help. Less comprehensive than this man page.
+.\" ------
+.SH BUGS
+No known bugs. Lots of unknown bugs.
+.\" ------
+.SH AUTHOR
+Chris F. Ravenscroft (chris@voilaweb.com)
