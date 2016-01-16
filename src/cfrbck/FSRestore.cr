@@ -1,11 +1,12 @@
 module FS
   class Restorer
-    getter start_dir, output_dir, force, verbose
+    getter start_dir, output_dir, force, dry_run, verbose
 
     def initialize(start_dir, output_dir)
       @start_dir    = FileUtil.canonical_path(start_dir)
       @output_dir   = FileUtil.canonical_path(output_dir)
       @force        = false
+      @dry_run      = false
       @verbose      = 1
     end
 
@@ -13,13 +14,19 @@ module FS
       @force = true
     end
 
+    def set_dry_run
+      @dry_run = true
+    end
+
     def verbose=(level)
       @verbose = level
     end
 
     def prepare
-      if !File.exists?(output_dir)
-        Dir.mkdir(output_dir)
+      if !dry_run
+        if !File.exists?(output_dir)
+          Dir.mkdir(output_dir)
+        end
       end
     end
 
@@ -35,22 +42,35 @@ module FS
     end
 
     def write_hierarchy(hierarchy)
+      puts "Re building hierarchy..." if verbose > 0
+
+      sp = Util::SimpleProgress.new hierarchy.size
+
       hierarchy.each do |entry|
         ((entry as Hash)["instances"] as Array).each do |instance|
           dir_path = File.join(output_dir,
               FileUtil.normalized_path(
                   (instance as Hash)["root"] as String,
                   (instance as Hash)["instance_path"] as String))
-          if !File.exists?(dir_path)
-            Dir.mkdir_p(dir_path, ((instance as Hash)["perm"] as String).to_i)
+          if !dry_run
+            if !File.exists?(dir_path)
+              Dir.mkdir(dir_path, ((instance as Hash)["perm"] as String).to_i)
+            end
           end
         end
+        sp.update 1 if verbose == 1
       end
+
+      sp.done if verbose == 1
     end
 
     # dn:s, store_name: s. fingerprint: s, instances: A ->
     # instance_path :s, root: s, mtime: s, perm: s, uid: s, gid: s
     def write_files(files)
+      puts "Restoring #{files.size} dedupped files..." if verbose > 0
+
+      sp = Util::SimpleProgress.new files.size
+
       files.each do |entry|
         store_name = (entry as Hash)["store_name"] as String
         ((entry as Hash)["instances"] as Array).each do |instance|
@@ -58,30 +78,46 @@ module FS
               FileUtil.normalized_path(
                   (instance as Hash)["root"] as String,
                   (instance as Hash)["instance_path"] as String))
-          FileUtil.copy(File.join(start_dir, store_name), file_path)
-          FileUtil.chmod(file_path, ((instance as Hash)["perm"] as String).to_i, force)
-          FileUtil.chown(file_path,
-              ((instance as Hash)["uid"] as String).to_i,
-              ((instance as Hash)["gid"] as String).to_i,
-              force)
+          if !dry_run
+            FileUtil.copy(File.join(start_dir, store_name), file_path)
+            FileUtil.chmod(file_path,
+                ((instance as Hash)["perm"] as String).to_i,
+                force)
+            FileUtil.chown(file_path,
+                ((instance as Hash)["uid"] as String).to_i,
+                ((instance as Hash)["gid"] as String).to_i,
+                force)
+          end
         end
+        sp.update 1 if verbose == 1
       end
+
+      sp.done if verbose == 1
     end
 
     # symlinkL: source, instances[0]{target_path:s, root:s, perm, uid, gid}
     def write_symlinks(symlinks)
+      puts "Restoring #{symlinks.size} symbolink links..." if verbose > 0
+
+      sp = Util::SimpleProgress.new symlinks.size
+
       symlinks.each do |entry|
         symlink_name = (entry as Hash)["symlink"] as String
         root         = (entry as Hash)["root"] as String
         source_path = FileUtil.normalized_path(root, symlink_name)
         ((entry as Hash)["instances"] as Array).each do |instance|
           file_path = File.join(output_dir, source_path)
-          FileUtil.symlink(
-              (instance as Hash)["target_path"] as String,
-              file_path,
-              force)
+          if !dry_run
+            FileUtil.symlink(
+                (instance as Hash)["target_path"] as String,
+                file_path,
+                force)
+          end
         end
+        sp.update 1 if verbose == 1
       end
+
+      sp.done if verbose == 1
     end
 
     def read_metadata

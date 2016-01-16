@@ -5,7 +5,8 @@ require "progress"
 
 module FS
   class Traverser
-    getter start_dir, output_dir, hierarchy, files, symlinks, ignore_dates, fingerprint, recheck, verbose
+    getter start_dir, output_dir, hierarchy, files, symlinks, ignore_dates,
+        fingerprint, excluded, recheck, dry_run, verbose
 
     def initialize(start_dir, output_dir)
       @start_dir    = FileUtil.canonical_path(start_dir)
@@ -16,6 +17,8 @@ module FS
       @stored_items = {} of String => String
       @ignore_dates = false
       @fingerprint  = false
+      @dry_run      = false
+      @excluded     = [] of Regex
       @recheck      = 1
       @use_md5      = true
       @verbose      = 1
@@ -29,8 +32,16 @@ module FS
       @fingerprint = true
     end
 
+    def set_dry_run
+      @dry_run = true
+    end
+
     def recheck=(level)
       @recheck = level
+    end
+
+    def excluded=(exclude_list)
+      @excluded = exclude_list
     end
 
     def verbose=(level)
@@ -54,8 +65,10 @@ module FS
     end
 
     def prepare
-      if !File.exists?(output_dir)
-        Dir.mkdir(output_dir)
+      if !dry_run
+        if !File.exists?(output_dir)
+          Dir.mkdir(output_dir)
+        end
       end
     end
 
@@ -77,23 +90,27 @@ module FS
 
     private def run_dir(depth, dir_name)
       d = Dir.new dir_name
-      this_dir_has_children = false
       d.each do |fe|
         next if fe == "." || fe == ".."
         fe_path = File.join(dir_name, fe.to_s)
-        padding = " " * depth
-        if File.directory?(fe_path)
-          puts "#{padding}[#{fe}]" if verbose > 1
-          this_dir_has_children = true
-          run_dir(depth+1,fe_path)
+        if desired?(fe_path)
+          padding = " " * depth
+          if File.directory?(fe_path)
+            puts "#{padding}[#{fe}]" if verbose > 1
+            check_dir name: fe_path, dir_path: fe_path
+            run_dir(depth+1,fe_path)
+          else
+            res = check_file name: fe.to_s, file_path: fe_path
+            puts "#{padding}#{res}" if verbose > 1
+          end
         else
-          res = check_file name: fe.to_s, file_path: fe_path
-          puts "#{padding}#{res}" if verbose > 1
+          puts "Ignoring #{fe_path} due to exclusion pattern" if verbose > 2
         end
       end
-      if this_dir_has_children == false
-        check_dir name: dir_name, dir_path: dir_name
-      end
+    end
+
+    private def desired?(path)
+      !excluded.any? { |exp| exp.match(path) }
     end
 
     private def recheck_run_dir(recheck)
@@ -158,7 +175,9 @@ module FS
         # of list size
         item = value.entries.first.file_path
         value.store_name = store_name
-        FileUtil.copy(item, File.join(output_dir, store_name))
+        if !dry_run
+          FileUtil.copy(item, File.join(output_dir, store_name))
+        end
         # fix fingerprint for files that do not have that computed yet
         if fingerprint && value.fingerprint == Entity::EmptyFingerprint
           value.fingerprint = get_file_checksum(item)
@@ -197,7 +216,9 @@ module FS
     end
 
     private def write_metadata
-      File.open(File.join(output_dir, "catalog.yml"), "w") { |f| YAML.dump(self, f) }
+      if !dry_run
+        File.open(File.join(output_dir, "catalog.yml"), "w") { |f| YAML.dump(self, f) }
+      end
     end
 
     private def check_file(name="", file_path="")

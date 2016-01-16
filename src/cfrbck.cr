@@ -24,10 +24,9 @@
 # 4. store metadata for future retrieval
 #
 # TODO
-# - A shameful limitation: due to optimization, dirs ownership etc not preserved
 # - Restore!!!
 # - Multiple roots
-# - Excludes
+# - Exclude @filename
 # - Incremental backups
 #   - New files
 #   - Deleted files
@@ -48,6 +47,8 @@ module Cfrbck
   ignore_dates   = false
   fingerprint    = false
   force          = false
+  dry_run        = false
+  excluded       = [] of Regex
   verbose_str    = "1"
   recheck_str    = "1"
   desired_action = Action::Undef
@@ -63,7 +64,9 @@ module Cfrbck
       parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
       parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
       parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
+      parser.on("-x pattern", "--exclude=pattern", "Exclude files matching pattern (backup)") { |pattern| excluded << Regex.new pattern }
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
+      parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }
       parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
       parser.on("-h", "--help") { proceed = false; puts parser }
       parser.unknown_args do |arg|
@@ -124,6 +127,13 @@ module Cfrbck
         puts "(recheck level = #{recheck_str})"
       end
       traverser.recheck = recheck
+      traverser.excluded = excluded
+      if dry_run
+        if verbose > 0
+          puts "Dry run!"
+        end
+        traverser.set_dry_run
+      end
       if verbose > 0
         puts "start_dir  = #{start_dir}"
         puts "output_dir = #{output_dir}"
@@ -144,6 +154,12 @@ module Cfrbck
           puts "(force continue)"
         end
         restorer.set_force
+      end
+      if dry_run
+        if verbose > 0
+          puts "Dry run!"
+        end
+        restorer.set_dry_run
       end
 
       restorer.prepare
