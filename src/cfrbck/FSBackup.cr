@@ -5,23 +5,21 @@ require "progress"
 
 module FS
   class Traverser
-    getter start_dir, output_dir, hierarchy, files, symlinks, ignore_dates,
+    getter start_dir, output_dir, meta_container, ignore_dates,
         fingerprint, excluded, recheck, dry_run, verbose
 
     def initialize(start_dir, output_dir)
-      @start_dir    = FileUtil.canonical_path(start_dir)
-      @output_dir   = FileUtil.canonical_path(output_dir)
-      @hierarchy    = Meta.new
-      @files        = Meta.new
-      @symlinks     = Meta.new
-      @stored_items = {} of String => String
-      @ignore_dates = false
-      @fingerprint  = false
-      @dry_run      = false
-      @excluded     = [] of Regex
-      @recheck      = 1
-      @use_md5      = true
-      @verbose      = 1
+      @start_dir      = FileUtil.canonical_path(start_dir)
+      @output_dir     = FileUtil.canonical_path(output_dir)
+      @meta_container = MetaContainer.new
+      @stored_items   = {} of String => String
+      @ignore_dates   = false
+      @fingerprint    = false
+      @dry_run        = false
+      @excluded       = [] of Regex
+      @recheck        = 1
+      @use_md5        = true
+      @verbose        = 1
     end
 
     def set_ignore_dates
@@ -50,16 +48,16 @@ module FS
 
     def dump_entities
       puts "* Dumping hierarchy:"
-      hierarchy.each do |key, value|
+      meta_container.hierarchy.each do |key, value|
         puts "+ #{key}:#{value}"
       end
       puts "* Dumping content of files:"
-      files.each do |key, value|
+      meta_container.files.each do |key, value|
         puts "+ #{key}:"
         value.dump
       end
       puts "* Dumping symlinks:"
-      symlinks.each do |key, value|
+      meta_container.symlinks.each do |key, value|
         puts "+ #{key}:#{value}"
       end
     end
@@ -116,7 +114,7 @@ module FS
     private def recheck_run_dir(recheck)
       puts "Double checking..."
       diff_files = Meta.new
-      files.each do |key, value|
+      meta_container.files.each do |key, value|
         if value.entries.size < 2
           next
         end
@@ -149,7 +147,7 @@ module FS
       end
       if diff_files.size > 0
         # Merge in place...ewww!
-        @files.merge!(diff_files)
+        meta_container.files.merge!(diff_files)
       end
     end
 
@@ -162,12 +160,12 @@ module FS
     # in parallel with same output directory
     # Alternatively I could start threading this code.
     private def write_files
-      files_count = files.count
-      puts "Copying #{files.size} unique files (for a total of #{files_count} file nodes)..." if verbose > 0
+      files_count = meta_container.files.count
+      puts "Copying #{meta_container.files.size} unique files (for a total of #{files_count} file nodes)..." if verbose > 0
 
       sp = Util::SimpleProgress.new files_count
 
-      files.each do |key, value|
+      meta_container.files.each do |key, value|
         uniqueid = SecureRandom.uuid
         store_name = uniqueid.to_s
 
@@ -190,11 +188,11 @@ module FS
 
     # noop
     private def write_hierarchy
-      puts "Memorizing #{hierarchy.size} directories..." if verbose > 0
+      puts "Memorizing #{meta_container.hierarchy.size} directories..." if verbose > 0
 
-      sp = Util::SimpleProgress.new hierarchy.size
+      sp = Util::SimpleProgress.new meta_container.hierarchy.size
 
-      hierarchy.each do |key, value|
+      meta_container.hierarchy.each do |key, value|
         sp.update value.count if verbose == 1
       end
 
@@ -203,11 +201,11 @@ module FS
 
     # noop
     private def write_symlinks
-      puts "Storing #{symlinks.size} symbolink links..." if verbose > 0
+      puts "Storing #{meta_container.symlinks.size} symbolink links..." if verbose > 0
 
-      sp = Util::SimpleProgress.new symlinks.size
+      sp = Util::SimpleProgress.new meta_container.symlinks.size
 
-      symlinks.each do |key, value|
+      meta_container.symlinks.each do |key, value|
         item = (value.entries.first as SymLinkInstance).target_path
         sp.update 1 if verbose == 1
       end
@@ -235,17 +233,17 @@ module FS
             index = f_stat.size.to_s + "::" + mtime_str + "::" + name
           end
           obj = FileInstance.new(file_path, @start_dir, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
-          if files.has_key?(index)
-            files[index].push obj
+          if meta_container.files.has_key?(index)
+            meta_container.files[index].push obj
           else
-            files[index] = Entity.new(Entity::Type::File, obj)
+            meta_container.files[index] = Entity.new(Entity::Type::File, obj)
           end
         else
           real_name = FileUtil.readlink(file_path)
           obj = SymLinkInstance.new(file_path, @start_dir, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
           entity = Entity.new(Entity::Type::SymLink, obj)
           entity.root = @start_dir
-          symlinks["#{file_path}"] = entity
+          meta_container.symlinks["#{file_path}"] = entity
         end
       else
         # TODO non existent file... e.g. broken symlink
@@ -258,7 +256,7 @@ module FS
         f_stat = File.lstat(dir_path)
         mtime_str = f_stat.mtime.epoch.to_s
         obj = FileInstance.new(dir_path, @start_dir, mtime_str, f_stat.perm, f_stat.uid, f_stat.gid)
-        hierarchy["#{dir_path}"] = Entity.new(Entity::Type::Directory, obj)
+        meta_container.hierarchy["#{dir_path}"] = Entity.new(Entity::Type::Directory, obj)
       end
       name
     end
@@ -267,17 +265,17 @@ module FS
       yaml.nl
       yaml << "symlinks:"
       yaml.indented do
-        symlinks.to_yaml(yaml)
+        meta_container.symlinks.to_yaml(yaml)
       end
       yaml.nl
       yaml << "files:"
       yaml.indented do
-        files.to_yaml(yaml)
+        meta_container.files.to_yaml(yaml)
       end
       yaml.nl
       yaml << "hierarchy:"
       yaml.indented do
-        hierarchy.to_yaml(yaml)
+        meta_container.hierarchy.to_yaml(yaml)
       end
     end
 
