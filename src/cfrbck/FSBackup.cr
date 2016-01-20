@@ -12,6 +12,8 @@ module FS
       @start_dir      = FileUtil.canonical_path(start_dir)
       @output_dir     = FileUtil.canonical_path(output_dir)
       @meta_container = MetaContainer.new
+      @comp_container = IndexContainer.new
+      @new_catalog_id = 1
       @stored_items   = {} of String => String
       @ignore_dates   = false
       @fingerprint    = false
@@ -68,6 +70,8 @@ module FS
           Dir.mkdir(output_dir)
         end
       end
+
+      read_metadata
     end
 
     def start
@@ -166,19 +170,40 @@ module FS
       sp = Util::SimpleProgress.new files_count
 
       meta_container.files.each do |key, value|
-        uniqueid = SecureRandom.uuid
-        store_name = uniqueid.to_s
+        must_save_file = false
 
-        # we are going to store first file, regardless
-        # of list size
         item = value.entries.first.file_path
-        value.store_name = store_name
-        if !dry_run
-          FileUtil.copy(item, File.join(output_dir, store_name))
-        end
         # fix fingerprint for files that do not have that computed yet
         if fingerprint && value.fingerprint == Entity::EmptyFingerprint
           value.fingerprint = get_file_checksum(item)
+        end
+
+        uniqueid = SecureRandom.uuid
+        store_name = uniqueid.to_s
+        # let us compare file fingerprint
+        value.entries.each do |entry|
+          norm_path = FileUtil.normalized_path(
+            start_dir,
+            entry.file_path)
+          if !@comp_container.files.has_key?(norm_path)
+            must_save_file = true
+          else
+            prev_info = @comp_container.files[norm_path]
+            if value.fingerprint != prev_info["fingerprint"]
+              must_save_file = true
+            else
+              store_name = prev_info["store_name"]
+            end
+          end
+        end
+
+        # we are going to store first file, regardless
+        # of list size
+        value.store_name = store_name
+        if must_save_file
+          if !dry_run
+            FileUtil.copy(item, File.join(output_dir, store_name))
+          end
         end
         sp.update value.count if verbose == 1
       end
@@ -213,9 +238,47 @@ module FS
       sp.done if verbose == 1
     end
 
+    private def read_metadata
+      matches = [] of String
+      d = Dir.new output_dir
+      # not using glob() as I do not wish to change directory
+      d.each do |fe|
+        fe.match(/catalog([0-9]+)\.yml/) do |match|
+          if match[1].to_i >= @new_catalog_id
+            @new_catalog_id = 1 + match[1].to_i
+          end
+          matches << fe.to_s
+        end
+      end
+      paths = FileUtil.sort_paths(matches)
+      paths.each do |path|
+        catalog = YAML.load(File.read(File.join(output_dir, path)))
+        hierarchy = (catalog as Hash)["hierarchy"] as Array
+        files     = (catalog as Hash)["files"] as Array
+        symlinks  = (catalog as Hash)["symlinks"] as Array
+        files.each do |entry|
+          store_name = (entry as Hash)["store_name"] as String
+          fingerprint = (entry as Hash)["fingerprint"] as String
+          ((entry as Hash)["instances"] as Array).each do |instance|
+            norm_path = FileUtil.normalized_path(
+              start_dir,
+              (instance as Hash)["instance_path"] as String)
+            @comp_container.files[norm_path] = {
+              "store_name" : store_name,
+              "fingerprint": fingerprint,
+              "uid": (instance as Hash)["uid"] as String,
+              "gid": (instance as Hash)["gid"] as String,
+              "perm": (instance as Hash)["perm"] as String,
+              "mtime": (instance as Hash)["mtime"] as String
+            }
+          end
+        end
+      end
+    end
+
     private def write_metadata
       if !dry_run
-        File.open(File.join(output_dir, "catalog.yml"), "w") { |f| YAML.dump(self, f) }
+        File.open(File.join(output_dir, "catalog#{@new_catalog_id}.yml"), "w") { |f| YAML.dump(self, f) }
       end
     end
 
@@ -262,6 +325,10 @@ module FS
     end
 
     def to_yaml(yaml : YAML::Generator)
+      yaml.nl("date: ")
+      Time.now.to_s.to_yaml(yaml)
+      yaml.nl("epoch: ")
+      Time.now.epoch.to_yaml(yaml)
       yaml.nl
       yaml << "symlinks:"
       yaml.indented do

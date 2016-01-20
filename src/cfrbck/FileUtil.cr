@@ -3,6 +3,7 @@ lib LibC
   fun symlink(target: Char*, link_path: Char*): Int
   fun chown(filename: Char*, owner: Int, group: Int): Int
   fun chmod(filename: Char*, mode: Int): Int
+  #fun qsort(base : Void*, nel : Int32, width : Int32, cb : (Void*, Void*) -> Int32)
 end
 
 require "file"
@@ -63,6 +64,13 @@ module FileUtil extend self
       raise "Attempt to normalize [#{path}] based on [#{canonp}] is not legal."
     end
     path.sub(canonp, "")
+  end
+
+  def sort_paths(paths : Array(String))
+    sorted_paths = paths.clone
+    #compar = ->(x : Void*, y : Void*) do (x as String*).value < (y as String*).value ? 1 : -1 end
+    #LibC.qsort(sorted_paths as Void*, sorted_paths.size, 4, compar)
+    sorted_paths.sort
   end
 
   class Math
