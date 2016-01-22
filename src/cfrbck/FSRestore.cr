@@ -79,7 +79,12 @@ module FS
                   (instance as Hash)["root"] as String,
                   (instance as Hash)["instance_path"] as String))
           if !dry_run
-            FileUtil.copy(File.join(start_dir, store_name), file_path)
+            compress = store_name.ends_with?("-z") ?
+                FileUtil::Action::EXPAND : FileUtil::Action::PRESERVE
+            FileUtil.copy(
+                File.join(start_dir, store_name),
+                file_path,
+                compress)
             FileUtil.chmod(file_path,
                 ((instance as Hash)["perm"] as String).to_i,
                 force)
@@ -121,7 +126,21 @@ module FS
     end
 
     def read_metadata
-      YAML.load(File.read(File.join(start_dir, "catalog.yml")))
+      ref_catalog = ""
+      d = Dir.new start_dir
+      # not using glob() as I do not wish to change directory
+      max_catalog_id = 1
+      d.each do |fe|
+        fe.match(/catalog([0-9]+)\.yml/) do |match|
+          if match[1].to_i >= max_catalog_id
+            max_catalog_id = 1 + match[1].to_i
+            ref_catalog = fe.to_s
+          end
+        end
+      end
+      if ref_catalog != ""
+        YAML.load(File.read(File.join(start_dir, ref_catalog)))
+      end
     end
   end
 end

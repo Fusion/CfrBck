@@ -14,7 +14,7 @@ many file duplicates are expected. This is a typical use case of container serve
 .SH ACTIONS
 .TP
 .BR "backup\ " \fR
-Backup files. Supported options: -s, -o, -d, -r, -p, -x, --dry-run, -v
+Backup files. Supported options: -s, -o, -d, -r, -p, -x, -z, --dry-run, -v
 .TP
 .BR "restore\ " \fR
 Restore files. Supported options: -s, -o, -f, --dry-run, -v
@@ -49,6 +49,11 @@ Exclude file paths matching regex pattern. Quotes are recommended.
 This option can be used multiple times to specify more than one pattern.
 .br
 Example: -x '/*\/etc/'
+.TP
+.BR "\-z, \-\-compress" \fR
+Compress artefacts to saves storage space.
+.br
+You can mix compressed and uncompressed incremental backups.
 .TP
 .BR "\-f, \-\-force" \fR
 Force restore to continue even if some errors were found.

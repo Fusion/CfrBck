@@ -6,7 +6,8 @@ require "progress"
 module FS
   class Traverser
     getter start_dir, output_dir, meta_container, ignore_dates,
-        fingerprint, excluded, recheck, dry_run, verbose
+        fingerprint, compress, excluded, recheck,
+        dry_run, verbose
 
     def initialize(start_dir, output_dir)
       @start_dir      = FileUtil.canonical_path(start_dir)
@@ -17,6 +18,7 @@ module FS
       @stored_items   = {} of String => String
       @ignore_dates   = false
       @fingerprint    = false
+      @compress       = false
       @dry_run        = false
       @excluded       = [] of Regex
       @recheck        = 1
@@ -30,6 +32,10 @@ module FS
 
     def set_fingerprint
       @fingerprint = true
+    end
+
+    def set_compress
+      @compress = true
     end
 
     def set_dry_run
@@ -155,6 +161,11 @@ module FS
       end
     end
 
+    private def get_new_artefact_id
+      uniqueid = SecureRandom.uuid
+      compress ? "#{uniqueid.to_s}-z" : uniqueid.to_s
+    end
+
     private def get_file_checksum(file_path)
         math = FileUtil::Math.new
         math.checksum(file_path, LocalCrypto::Algorithm::MD5)
@@ -178,8 +189,8 @@ module FS
           value.fingerprint = get_file_checksum(item)
         end
 
-        uniqueid = SecureRandom.uuid
-        store_name = uniqueid.to_s
+        store_name = get_new_artefact_id
+
         # let us compare file fingerprint
         value.entries.each do |entry|
           norm_path = FileUtil.normalized_path(
@@ -202,7 +213,10 @@ module FS
         value.store_name = store_name
         if must_save_file
           if !dry_run
-            FileUtil.copy(item, File.join(output_dir, store_name))
+            FileUtil.copy(
+                item,
+                File.join(output_dir, store_name),
+                compress ? FileUtil::Action::COMPRESS : FileUtil::Action::PRESERVE)
           end
         end
         sp.update value.count if verbose == 1
@@ -239,20 +253,30 @@ module FS
     end
 
     private def read_metadata
-      matches = [] of String
+      if dry_run
+        return
+      end
+
+      ref_catalog = ""
+      # matches are unused in backup
+      # use in restore though
+      #matches = [] of String
+      #paths = FileUtil.sort_paths(matches)
+      #paths.each do |path|
+
       d = Dir.new output_dir
       # not using glob() as I do not wish to change directory
       d.each do |fe|
         fe.match(/catalog([0-9]+)\.yml/) do |match|
           if match[1].to_i >= @new_catalog_id
             @new_catalog_id = 1 + match[1].to_i
+            ref_catalog = fe.to_s
           end
-          matches << fe.to_s
         end
       end
-      paths = FileUtil.sort_paths(matches)
-      paths.each do |path|
-        catalog = YAML.load(File.read(File.join(output_dir, path)))
+
+      if ref_catalog != ""
+        catalog = YAML.load(File.read(File.join(output_dir, ref_catalog)))
         hierarchy = (catalog as Hash)["hierarchy"] as Array
         files     = (catalog as Hash)["files"] as Array
         symlinks  = (catalog as Hash)["symlinks"] as Array

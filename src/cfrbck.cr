@@ -31,6 +31,8 @@
 #   - New files
 #   - Deleted files
 #   - Updated files
+# - Vacuum command to remove non-referenced (by catalogs) files
+# - Compression: artefacts = name+'z' ...?
 
 require "option_parser"
 require "./cfrbck/*"
@@ -46,6 +48,7 @@ module Cfrbck
   output_dir     = ""
   ignore_dates   = false
   fingerprint    = false
+  compress       = false
   force          = false
   dry_run        = false
   excluded       = [] of Regex
@@ -64,6 +67,7 @@ module Cfrbck
       parser.on("-d", "--ignore-dates", "Ignore dates") { ignore_dates = true }
       parser.on("-r level", "--recheck=level", "Recheck (0=no, 1=hash, 2=tbd!)") { |level| recheck_str = level }
       parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
+      parser.on("-z", "--compress", "Compress artefacts (backup)") { compress = true }
       parser.on("-x pattern", "--exclude=pattern", "Exclude files matching pattern (backup)") { |pattern| excluded << Regex.new pattern }
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }
@@ -122,6 +126,12 @@ module Cfrbck
           puts "(generating fingerprints)"
         end
         traverser.set_fingerprint
+      end
+      if compress
+        if verbose > 1
+          puts "(compressing artefacts)"
+        end
+        traverser.set_compress
       end
       if verbose > 1
         puts "(recheck level = #{recheck_str})"
