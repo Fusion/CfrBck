@@ -307,6 +307,7 @@ module FS
     end
 
     private def check_file(name="", file_path="")
+      rsh = (file_path =~ /awk/)
       if File.exists?(file_path)
         f_stat = File.lstat(file_path)
         # NOTE: mtime is what we are after. ctime would be modified in more situations
@@ -333,7 +334,15 @@ module FS
           meta_container.symlinks["#{file_path}"] = entity
         end
       else
-        # TODO non existent file... e.g. broken symlink
+        # non existent file... e.g. broken symlink
+        f_stat = File.lstat(file_path)
+        if f_stat.symlink?
+          real_name = FileUtil.readlink(file_path)
+          obj = SymLinkInstance.new(file_path, @start_dir, real_name, f_stat.perm, f_stat.uid, f_stat.gid)
+          entity = Entity.new(Entity::Type::SymLink, obj)
+          entity.root = @start_dir
+          meta_container.symlinks["#{file_path}"] = entity
+        end
       end
       name
     end
