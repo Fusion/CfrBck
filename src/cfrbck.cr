@@ -1,38 +1,19 @@
-# This a a dedupping backup tool. Or it will be some day (hopefully!)
+# This a a dedupping backup tool.
 
 # First, we go through all the files found under a common root directory;
 # we will create a table of files that are deemed "same" i.e. with:
 # 1.a. same size, modification date, name
 # 1.b. or same size and name (testing purpose only! seriously!)
 # 2. same name, size and hash -- there is still potential for false positives
-# Not inmplemented:
+# Not inmplemented and not sure necessary:
 # -2
-# -files with different names: use hash instead of file name then check?
-#
-# So, what are we storing?
-# For each instance of a file:
-# - full path
-# - mod
-# - ownership
-# - ext attrs?
-#
-# Second, we run through all these files, and for each one, we:
-# 1. create a new uniqueid
-# 2. store file as uniqueid
-# 3.a. make a db note of uniqueid -> index(filename, etc) -> instances
-# 3.b. make a db note of index(filename, etc) -> uniqueid -> instances
-# 4. store metadata for future retrieval
 #
 # TODO
-# - Restore!!!
+# - Come up with better name!
 # - Multiple roots
 # - Exclude @filename
-# - Incremental backups
-#   - New files
-#   - Deleted files
-#   - Updated files
+# - Merged catalogs to avoid restoring multiple instances
 # - Vacuum command to remove non-referenced (by catalogs) files
-# - Compression: artefacts = name+'z' ...?
 
 require "option_parser"
 require "./cfrbck/*"
