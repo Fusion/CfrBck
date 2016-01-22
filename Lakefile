@@ -1,9 +1,13 @@
 Task.build
-    require "process"
     puts "Building C compression library: miniz"
     `cd src/C && gcc -c miniz.c cfrminiz.c && gcc -shared -o libminiz.so cfrminiz.o`
     `cp src/C/libminiz.so .`
 
-Task.clean
+Task.install
+    `sudo cp cfrbck /usr/local/bin/cfrbck`
+    `sudo cp src/man/cfrbck /usr/local/share/man/man1/cfrbck.1`
+
+Task.cleantests
     `rm -rf bck`
     `rm -rf rst`
+
