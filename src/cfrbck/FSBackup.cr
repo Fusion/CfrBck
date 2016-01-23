@@ -358,10 +358,22 @@ module FS
     end
 
     def to_yaml(yaml : YAML::Generator)
-      yaml.nl("date: ")
-      Time.now.to_s.to_yaml(yaml)
-      yaml.nl("epoch: ")
-      Time.now.epoch.to_yaml(yaml)
+      yaml.nl
+      yaml << "meta:"
+      yaml.indented do
+        yaml.nl("date: ")
+        Time.now.to_s.to_yaml(yaml)
+        yaml.nl("epoch: ")
+        Time.now.epoch.to_yaml(yaml)
+        yaml.nl("directories: ")
+        meta_container.hierarchy.size.to_yaml(yaml)
+        yaml.nl("files: ")
+        meta_container.files.count.to_yaml(yaml)
+        yaml.nl("artefacts: ")
+        meta_container.files.size.to_yaml(yaml)
+        yaml.nl("symlinks: ")
+        meta_container.symlinks.size.to_yaml(yaml)
+      end
       yaml.nl
       yaml << "symlinks:"
       yaml.indented do

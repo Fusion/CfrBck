@@ -23,10 +23,12 @@ module Cfrbck
     Undef
     Backup
     Restore
+    Info
   end
 
   start_dir      = ""
   output_dir     = ""
+  catalog        = ""
   ignore_dates   = false
   fingerprint    = false
   compress       = false
@@ -41,7 +43,7 @@ module Cfrbck
 
   begin
     OptionParser.parse! do |parser|
-      parser.banner = "Usage: cfrbck [option 1] ... [option n] <backup|restore>"
+      parser.banner = "Usage: cfrbck [option 1] ... [option n] backup | restore | info <dir>"
       parser.separator("\nA reasonably good compromise: -d -r 1\nTo perform incremental backups: -d -r 1 -p\n\nExamples:\n\ncfrbck -d -r 1 -p -s test backup\ncfrbck -d -r 1 -s bck -o rst restore\n")
       parser.on("-s dir", "--start=dir", "Starting directory (default=.)") { |dir| start_dir = dir }
       parser.on("-o dir", "--output=dir", "Backup directory (default=bck)") { |dir| output_dir = dir }
@@ -50,6 +52,7 @@ module Cfrbck
       parser.on("-p", "--fingerprint", "Compute Fingerprint") { fingerprint = true }
       parser.on("-z", "--compress", "Compress artefacts (backup)") { compress = true }
       parser.on("-x pattern", "--exclude=pattern", "Exclude files matching pattern (backup)") { |pattern| excluded << Regex.new pattern }
+      parser.on("-c name", "--catalog=name", "Use catalog for time machine (restore)") { |name| catalog = name }
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }
       parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
@@ -66,6 +69,9 @@ module Cfrbck
               output_dir = "rst"
             end
             desired_action = Action::Restore
+          elsif arg[0] == "info"
+            start_dir = arg[1] if arg.size > 1
+            desired_action = Action::Info
           end
         end
       end
@@ -134,11 +140,17 @@ module Cfrbck
       traverser.start
       traverser.dump_entities if verbose > 2
 
-    else # RESTORE
+    elsif desired_action == Action::Restore
       restorer = FS::Restorer.new(start_dir, output_dir)
       if verbose > 1
         puts "(verbose output level: #{verbose})"
         restorer.verbose = verbose
+      end
+      if catalog != ""
+        if verbose > 1
+          puts "(catalog file: #{catalog})"
+        end
+        restorer.catalog = catalog
       end
       if force
         if verbose > 1
@@ -156,6 +168,8 @@ module Cfrbck
       restorer.prepare
       restorer.start
 
+    elsif desired_action == Action::Info
+      info = FS::Info.new start_dir
     end
   end
 end

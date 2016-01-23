@@ -17,7 +17,10 @@ many file duplicates are expected. This is a typical use case of container serve
 Backup files. Supported options: -s, -o, -d, -r, -p, -x, -z, --dry-run, -v
 .TP
 .BR "restore\ " \fR
-Restore files. Supported options: -s, -o, -f, --dry-run, -v
+Restore files. Supported options: -s, -o, -c, -f, --dry-run, -v
+.TP
+.BR "info <dir>\ " \fR
+Display meta information from catalog files in dir
 .\" ------
 .SH OPTIONS
 .TP
@@ -27,6 +30,9 @@ In future releases, it will be possible to select more than one.
 .TP
 .BR "\-o dir, \-\-output=dir" \fR
 Backup output/destination directory.
+.TP
+.BR "\-c name, \-\-catalog=name" \fR
+Use catalog 'name' when restoring (time machine feature)
 .TP
 .BR "\-d, \-\-ignore\-dates" \fR
 Do not use file dates when checking for duplicates.

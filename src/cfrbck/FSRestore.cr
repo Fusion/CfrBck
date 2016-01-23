@@ -1,13 +1,18 @@
 module FS
   class Restorer
-    getter start_dir, output_dir, force, dry_run, verbose
+    getter start_dir, output_dir, catalog_name, force, dry_run, verbose
 
     def initialize(start_dir, output_dir)
       @start_dir    = FileUtil.canonical_path(start_dir)
       @output_dir   = FileUtil.canonical_path(output_dir)
+      @catalog_name = ""
       @force        = false
       @dry_run      = false
       @verbose      = 1
+    end
+
+    def catalog=(name)
+      @catalog_name = name
     end
 
     def set_force
@@ -31,7 +36,7 @@ module FS
     end
 
     def start
-      catalog = read_metadata
+      catalog   = read_metadata
       hierarchy = (catalog as Hash)["hierarchy"] as Array
       files     = (catalog as Hash)["files"] as Array
       symlinks  = (catalog as Hash)["symlinks"] as Array
@@ -126,18 +131,23 @@ module FS
     end
 
     def read_metadata
-      ref_catalog = ""
-      d = Dir.new start_dir
-      # not using glob() as I do not wish to change directory
-      max_catalog_id = 1
-      d.each do |fe|
-        fe.match(/catalog([0-9]+)\.yml/) do |match|
-          if match[1].to_i >= max_catalog_id
-            max_catalog_id = 1 + match[1].to_i
-            ref_catalog = fe.to_s
+      if catalog_name == ""
+        ref_catalog = ""
+        d = Dir.new start_dir
+        # not using glob() as I do not wish to change directory
+        max_catalog_id = 1
+        d.each do |fe|
+          fe.match(/catalog([0-9]+)\.yml/) do |match|
+            if match[1].to_i >= max_catalog_id
+              max_catalog_id = 1 + match[1].to_i
+              ref_catalog = fe.to_s
+            end
           end
         end
+      else
+        ref_catalog = catalog_name
       end
+      
       if ref_catalog != ""
         YAML.load(File.read(File.join(start_dir, ref_catalog)))
       end
