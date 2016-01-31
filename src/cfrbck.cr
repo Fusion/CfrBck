@@ -29,6 +29,8 @@ module Cfrbck
   start_dir      = ""
   output_dir     = ""
   catalog        = ""
+  platform       = "local"
+  auth_file_name = "~/.cfrbck.auth"
   ignore_dates   = false
   fingerprint    = false
   compress       = false
@@ -53,6 +55,8 @@ module Cfrbck
       parser.on("-z", "--compress", "Compress artefacts (backup)") { compress = true }
       parser.on("-x pattern", "--exclude=pattern", "Exclude files matching pattern (backup)") { |pattern| excluded << Regex.new pattern }
       parser.on("-c name", "--catalog=name", "Use catalog for time machine (restore)") { |name| catalog = name }
+      parser.on("-l name", "--platform=name", "Storage platform (local|pipe)") { |name| platform = name }
+      parser.on("-a name", "--auth=name", "File containing credentials for platform") { |name| auth_file_name = name }
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }
       parser.on("-v level", "--verbose=level", "Verbose (0=quiet)") { |level| verbose_str = level }
@@ -96,8 +100,14 @@ module Cfrbck
     verbose = verbose_str.to_i
     recheck = recheck_str.to_i
 
+    config = FileUtil::Config.new
+    config.start_dir = start_dir
+    config.output_dir = output_dir
+    config.platform_name = platform
+    config.auth_file_name = auth_file_name
+
     if desired_action == Action::Backup
-      traverser = FS::Traverser.new(start_dir, output_dir)
+      traverser = FS::Traverser.new(config)
       if verbose > 1
         puts "(verbose output level: #{verbose})"
         traverser.verbose = verbose
@@ -121,6 +131,9 @@ module Cfrbck
         traverser.set_compress
       end
       if verbose > 1
+        puts "(platform: #{platform})"
+      end
+      if verbose > 1
         puts "(recheck level = #{recheck_str})"
       end
       traverser.recheck = recheck
@@ -141,7 +154,7 @@ module Cfrbck
       traverser.dump_entities if verbose > 2
 
     elsif desired_action == Action::Restore
-      restorer = FS::Restorer.new(start_dir, output_dir)
+      restorer = FS::Restorer.new(config)
       if verbose > 1
         puts "(verbose output level: #{verbose})"
         restorer.verbose = verbose
@@ -151,6 +164,9 @@ module Cfrbck
           puts "(catalog file: #{catalog})"
         end
         restorer.catalog = catalog
+      end
+      if verbose > 1
+        puts "(platform: #{platform})"
       end
       if force
         if verbose > 1

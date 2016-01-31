@@ -1,18 +1,25 @@
 module FS
   class Restorer
-    getter start_dir, output_dir, catalog_name, force, dry_run, verbose
+    getter start_dir, output_dir, catalog_name, platform_name,
+        force, dry_run, verbose
 
-    def initialize(start_dir, output_dir)
-      @start_dir    = FileUtil.canonical_path(start_dir)
-      @output_dir   = FileUtil.canonical_path(output_dir)
-      @catalog_name = ""
-      @force        = false
-      @dry_run      = false
-      @verbose      = 1
+    def initialize(config)
+      @start_dir     = FileUtil.canonical_path(config.start_dir)
+      @output_dir    = FileUtil.canonical_path(config.output_dir)
+      @file_util     = FileUtil.get_actor(config.platform_name, config.auth_file_name)
+      @catalog_name  = ""
+      @platform_name = ""
+      @force         = false
+      @dry_run       = false
+      @verbose       = 1
     end
 
     def catalog=(name)
       @catalog_name = name
+    end
+
+    def platform=(name)
+      @platform_name = name
     end
 
     def set_force
@@ -86,7 +93,7 @@ module FS
           if !dry_run
             compress = store_name.ends_with?("-z") ?
                 FileUtil::Action::EXPAND : FileUtil::Action::PRESERVE
-            FileUtil.copy(
+            @file_util.copy(
                 File.join(start_dir, store_name),
                 file_path,
                 compress)
@@ -147,7 +154,7 @@ module FS
       else
         ref_catalog = catalog_name
       end
-      
+
       if ref_catalog != ""
         YAML.load(File.read(File.join(start_dir, ref_catalog)))
       end

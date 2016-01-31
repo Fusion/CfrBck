@@ -16,46 +16,16 @@ module FileUtil extend self
     EXPAND
   end
 
-  def copy(source_path, dest_path, compress?)
-    case compress?
-    when FileUtil::Action::COMPRESS
-      compress_copy(source_path, dest_path)
-    when FileUtil::Action::EXPAND
-      expand_copy(source_path, dest_path)
+  def get_actor(platform_name, auth_file_name)
+    case platform_name
+    when "local"
+      LocalUtil::Actor.new
+    when "s3"
+      S3Util::Actor.new auth_file_name
+    when "pipe"
+      PipeUtil::Actor.new
     else
-      preserve_copy(source_path, dest_path)
-    end
-  end
-
-  private def compress_copy(source_path, dest_path)
-    if 0 != Compress.compress(source_path, dest_path)
-      raise "Error compressing #{source_path}"
-    end
-  end
-
-  private def expand_copy(source_path, dest_path)
-    if 0 != Compress.expand(source_path, dest_path)
-      raise "Error expanding #{source_path}"
-    end
-  end
-
-  private def preserve_copy(source_path, dest_path)
-    File.open(source_path, "r")  do |file_in|
-      File.open(dest_path, "w") do |file_out|
-        bufsize = 4096
-        buffer = Slice(UInt8).new(bufsize)
-        complete = false
-        until complete
-          count = file_in.read(buffer)
-          if count == bufsize
-            file_out.write(buffer)
-          else
-            partial_buffer = Slice(UInt8).new(count) { |i| buffer[i] }
-            file_out.write(partial_buffer)
-            complete = true
-          end
-        end
-      end
+      raise FileUtilException.new "Unknown platform type"
     end
   end
 
@@ -67,19 +37,19 @@ module FileUtil extend self
 
   def symlink(target, link_path, force = false)
     if 0 != LibC.symlink(target, link_path)
-      raise "Unable to create symbolic link #{target} for #{link_path}" unless force
+      raise FileUtilException.new "Unable to create symbolic link #{target} for #{link_path}" unless force
     end
   end
 
   def chown(file_path, owner, group, force = false)
     if 0 != LibC.chown(file_path, owner, group)
-      raise "Unable to change ownerhsip to #{owner}:#{group} for file #{file_path}" unless force
+      raise FileUtilException.new "Unable to change ownerhsip to #{owner}:#{group} for file #{file_path}" unless force
     end
   end
 
   def chmod(file_path, mode, force = false)
     if 0 != LibC.chmod(file_path, mode)
-      raise "Unable to change mode to #{mode} for file #{file_path}" unless force
+      raise FileUtilException.new "Unable to change mode to #{mode} for file #{file_path}" unless force
     end
   end
 
@@ -90,7 +60,7 @@ module FileUtil extend self
   def normalized_path(canon, path)
     canonp = File.join(canon, "")
     if !path.starts_with? canon
-      raise "Attempt to normalize [#{path}] based on [#{canonp}] is not legal."
+      raise FileUtilException.new "Attempt to normalize [#{path}] based on [#{canonp}] is not legal."
     end
     path.sub(canonp, "")
   end
@@ -100,6 +70,12 @@ module FileUtil extend self
     #compar = ->(x : Void*, y : Void*) do (x as String*).value < (y as String*).value ? 1 : -1 end
     #LibC.qsort(sorted_paths as Void*, sorted_paths.size, 4, compar)
     sorted_paths.sort
+  end
+
+  class FileUtilException < Exception
+  end
+
+  class FileCompressionException < FileUtilException
   end
 
   class Math

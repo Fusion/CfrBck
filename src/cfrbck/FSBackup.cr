@@ -6,12 +6,13 @@ require "progress"
 module FS
   class Traverser
     getter start_dir, output_dir, meta_container, ignore_dates,
-        fingerprint, compress, excluded, recheck,
-        dry_run, verbose
+        fingerprint, compress, platform_name, excluded,
+        recheck, dry_run, verbose
 
-    def initialize(start_dir, output_dir)
-      @start_dir      = FileUtil.canonical_path(start_dir)
-      @output_dir     = FileUtil.canonical_path(output_dir)
+    def initialize(config)
+      @start_dir      = FileUtil.canonical_path(config.start_dir)
+      @output_dir     = FileUtil.canonical_path(config.output_dir)
+      @file_util      = FileUtil.get_actor(config.platform_name, config.auth_file_name)
       @meta_container = MetaContainer.new
       @comp_container = IndexContainer.new
       @new_catalog_id = 1
@@ -20,6 +21,7 @@ module FS
       @fingerprint    = false
       @compress       = false
       @dry_run        = false
+      @platform_name  = "local"
       @excluded       = [] of Regex
       @recheck        = 1
       @use_md5        = true
@@ -44,6 +46,10 @@ module FS
 
     def recheck=(level)
       @recheck = level
+    end
+
+    def platform=(name)
+      @platform_name = name
     end
 
     def excluded=(exclude_list)
@@ -213,7 +219,7 @@ module FS
         value.store_name = store_name
         if must_save_file
           if !dry_run
-            FileUtil.copy(
+            @file_util.copy(
                 item,
                 File.join(output_dir, store_name),
                 compress ? FileUtil::Action::COMPRESS : FileUtil::Action::PRESERVE)

@@ -7,13 +7,7 @@ authors:
 dependencies:
   progress:
     github: askn/progress
-
-development_dependencies:
-  progress:
-    github: askn/progress
-  minitest:
-    github: ysbaddaden/minitest.cr
-    branch: master
-    #version: "> 0.1.5"
+  ssh:
+    github: datanoise/ssh2.cr
 
 license: Apache-2.0
