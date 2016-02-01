@@ -1,5 +1,5 @@
-@[Link("miniz")]
-lib LibMini
+@[Link("minizs3")]
+lib LibMS
   fun mz_compress(pDest: UInt8*, pDest_len: UInt32*, pSource: UInt8*, source_len: Int32): Int8
   fun mz_uncompress(pDest: UInt8*, pDest_len: UInt32*, pSource: UInt8*, source_len: Int32): Int8
 
@@ -10,18 +10,18 @@ end
 
 module Compress extend self
   def compress(source_path, dest_path)
-    LibMini.mzx_copy_deflate(dest_path, source_path, 9)
+    LibMS.mzx_copy_deflate(dest_path, source_path, 9)
   end
 
   def expand(source_path, dest_path)
-    LibMini.mzx_copy_inflate(dest_path, source_path)
+    LibMS.mzx_copy_inflate(dest_path, source_path)
   end
 
   def test
-    LibMini.mzx_copy_deflate("bogus.out", "README.md", 9)
-    LibMini.mzx_copy_inflate("bogus.decrypted", "bogus.out")
-    LibMini.mzx_copy_deflate("bogus2.out", "LICENSE", 9)
-    LibMini.mzx_copy_inflate("bogus2.decrypted", "bogus2.out")
+    LibMS.mzx_copy_deflate("bogus.out", "README.md", 9)
+    LibMS.mzx_copy_inflate("bogus.decrypted", "bogus.out")
+    LibMS.mzx_copy_deflate("bogus2.out", "LICENSE", 9)
+    LibMS.mzx_copy_inflate("bogus2.decrypted", "bogus2.out")
 #    target_path_ptr = Pointer(UInt8).malloc(32768)
 #    size_ptr = Pointer(UInt32).malloc(1)
 #    size_ptr.value = 32767_u32

@@ -13,29 +13,7 @@
 #include <openssl/evp.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
-
-/// IOBuf Node
-typedef struct _IOBufNode
-{
-  char * buf;
-  struct _IOBufNode * next;
-} IOBufNode;
-
-/// IOBuf structure
-typedef struct IOBuf
-{
-  IOBufNode * first;
-  IOBufNode * current;
-  char   * pos;
-
-  char * result;
-  char * lastMod;
-  char * eTag;
-  int contentLen;
-  int len;
-  int code;
-
-} IOBuf;
+#include "shared.h"
 
 static char *S3Host     = "s3.amazonaws.com";     /// <AWS S3 host
 static char *awsKeyID = NULL;
@@ -60,44 +38,10 @@ void aws_set_accesscontrol( char * const accesscontrol )
 void aws_set_mimetype( char * const mimetype )
 { awsMimeType = mimetype == NULL ? NULL : strdup(mimetype); }
 
-/// Create a new I/O buffer
-/// \return a newly allocated I/O buffer
-IOBuf * aws_iobuf_new ()
-{
-  IOBuf * bf = malloc(sizeof(IOBuf));
-
-  memset(bf, 0, sizeof(IOBuf));
-
+IOStreamDescriptor * aws_iobuf_new () {
+  IOStreamDescriptor * bf = malloc(sizeof(IOStreamDescriptor));
+  memset(bf, 0, sizeof(IOStreamDescriptor));
   return bf;
-}
-
-/// Append data to I/O buffer
-/// \param B  I/O buffer
-/// \param d  pointer to the data to be appended
-/// \param len length of the data to be appended
-void   aws_iobuf_append ( IOBuf *B, char * d, int len )
-{
-
-  IOBufNode * N = malloc(sizeof(IOBufNode));
-  N->next = NULL;
-  N->buf  = malloc(len+1);
-  memcpy(N->buf,d,len);
-  N->buf[len] = 0;
-  B->len += len;
-
-  if ( B->first == NULL )
-    {
-      B->first   = N;
-      B->current = N;
-      B->pos     = N->buf;
-    }
-  else
-    {
-      // Find the last block
-      IOBufNode * D = B->first;
-      while(D->next != NULL ) D = D->next;
-      D->next = N;
-    }
 }
 
  /// Encode a binary into base64 buffer
@@ -224,36 +168,6 @@ static void __chomp ( char  * str ) {
   if ( str[ln] == '\r' ) str[ln] = 0;
 }
 
-/// Read the next line from the buffer
-///  \param B I/O buffer
-///  \param Line  character array to store the read line in
-///  \param size  size of the character array Line
-///  \return  number of characters read or 0.
-int    aws_iobuf_getline   ( IOBuf * B, char * Line, int size ) {
-  int ln = 0;
-  memset ( Line, 0, size );
-
-  if ( B->current == NULL ) return 0;
-
-  while ( size - ln > 1 )
-    {
-      if ( *B->pos == '\n' ) { B->pos++; Line[ln] = '\n'; ln++; break; }
-      if ( *B->pos == 0 )
-      {
-        B->current = B->current->next;
-        if ( B->current == NULL ) break;
-        B->pos = B->current->buf;
-        continue;
-      }
-      Line[ln] = * B->pos;
-      ln++;
-      B->pos++;
-      // At the end of the block switch again
-    }
-  B->len -= ln;
-  return ln;
-}
-
 /// Suppress outputs to stdout
 static size_t writedummyfunc ( void * ptr, size_t size, size_t nmemb, void * stream ) {
   // Debug: printf("READ: %s\n", (char*)ptr);
@@ -267,7 +181,7 @@ static size_t writedummyfunc ( void * ptr, size_t size, size_t nmemb, void * str
 /// \param stream pointer to I/O buffer
 /// \return number of bytes written
 static size_t readfunc ( void * ptr, size_t size, size_t nmemb, void * stream ) {
-  return aws_iobuf_getline ( stream, ptr, size*nmemb);
+  return fread(ptr, size, nmemb, ((IOStreamDescriptor *)stream)->fd);
 }
 
 /// Process incming header
@@ -278,7 +192,7 @@ static size_t readfunc ( void * ptr, size_t size, size_t nmemb, void * stream ) 
 /// \return number of bytes processed
 static size_t header ( void * ptr, size_t size, size_t nmemb, void * stream )
 {
-  IOBuf * b = stream;
+  IOStreamDescriptor * b = stream;
 
   if (!strncmp ( ptr, "HTTP/1.1", 8 ))
     {
@@ -304,63 +218,108 @@ static size_t header ( void * ptr, size_t size, size_t nmemb, void * stream )
   return nmemb * size;
 }
 
+void cr_aws_put_run(IOParameters params) {
+
+  curl_global_init (CURL_GLOBAL_ALL);
+  char work_buf[1024];
+
+  CURL* ch =  curl_easy_init( );
+  struct curl_slist *slist=NULL;
+
+  if (awsMimeType) {
+    snprintf (work_buf, sizeof(work_buf), "Content-Type: %s", awsMimeType);
+    slist = curl_slist_append(slist, work_buf);
+  }
+
+  if (awsAccessControl) {
+    snprintf (work_buf, sizeof(work_buf), "x-amz-acl: %s", awsAccessControl);
+    slist = curl_slist_append(slist, work_buf);
+  }
+
+  if (useRrs) {
+    strncpy (work_buf, "x-amz-storage-class: REDUCED_REDUNDANCY", sizeof(work_buf));
+    slist = curl_slist_append(slist, work_buf); }
+
+  snprintf (work_buf, sizeof(work_buf), "Date: %s", params.date_str);
+  slist = curl_slist_append(slist, work_buf);
+  snprintf (work_buf, sizeof(work_buf), "Authorization: AWS %s:%s", awsKeyID, params.signature);
+  slist = curl_slist_append(slist, work_buf);
+
+  snprintf (work_buf, sizeof(work_buf), "http://%s.%s/%s", params.bucket, S3Host , params.resource_name);
+
+  curl_easy_setopt ( ch, CURLOPT_READDATA, params.bf );
+  curl_easy_setopt ( ch, CURLOPT_READFUNCTION, params.callback );
+
+  curl_easy_setopt ( ch, CURLOPT_HTTPHEADER, slist);
+  curl_easy_setopt ( ch, CURLOPT_URL, work_buf );
+  //curl_easy_setopt ( ch, CURLOPT_READDATA, params.bf );
+  curl_easy_setopt ( ch, CURLOPT_WRITEFUNCTION, writedummyfunc );
+  curl_easy_setopt ( ch, CURLOPT_HEADERFUNCTION, header );
+  curl_easy_setopt ( ch, CURLOPT_HEADERDATA, params.bf );
+  curl_easy_setopt ( ch, CURLOPT_VERBOSE, 0 );
+  curl_easy_setopt ( ch, CURLOPT_UPLOAD, 1 );
+  curl_easy_setopt ( ch, CURLOPT_INFILESIZE, params.bf->len );
+  curl_easy_setopt ( ch, CURLOPT_FOLLOWLOCATION, 1 );
+
+  int  sc  = curl_easy_perform(ch);
+  curl_slist_free_all(slist);
+  curl_easy_cleanup(ch);
+}
+
 void cr_aws_put(
   const char *date_str,
   const char *signature,
   const char *resource_name,
   const char *resource_path,
   const char *bucket) {
+    // TODO Free bf after work OR better: zero out and re use it!
+    // Right now this is a huge memory leak...
+    IOStreamDescriptor *bf = aws_iobuf_new();
+    bf->fd = fopen(resource_path, "rb");
+    fseek(bf->fd, 0L, SEEK_END);
+    bf->len = ftell(bf->fd);
+    fseek(bf->fd, 0L, SEEK_SET);
 
-  curl_global_init (CURL_GLOBAL_ALL);
-  IOBuf *bf = aws_iobuf_new();
-  char Buf[1024];
+    IOParameters params;
+    params.date_str = date_str;
+    params.signature = signature;
+    params.resource_name = resource_name;
+    params.resource_path = resource_path;
+    params.bucket = bucket;
+    params.bf = bf;
+    params.callback = readfunc;
+    cr_aws_put_run(params);
 
-  CURL* ch =  curl_easy_init( );
-  struct curl_slist *slist=NULL;
+    fclose(bf->fd);
+}
 
-  if (awsMimeType) {
-    snprintf ( Buf, sizeof(Buf), "Content-Type: %s", awsMimeType );
-    slist = curl_slist_append(slist, Buf );
-  }
+/*
+ * Do not use! If we use CURL directly and compress our file on the fly,
+ * then we will hang forever due to the promised file size being off.
+ */
+void cr_aws_put_compress(
+  const char *date_str,
+  const char *signature,
+  const char *resource_name,
+  const char *resource_path,
+  const char *bucket) {
 
-  if (awsAccessControl) {
-    snprintf ( Buf, sizeof(Buf), "x-amz-acl: %s", awsAccessControl );
-    slist = curl_slist_append(slist, Buf );
-  }
+    IOStreamDescriptor *bf = aws_iobuf_new();
+    bf->fd = fopen(resource_path, "rb");
+    fseek(bf->fd, 0L, SEEK_END);
+    bf->len = ftell(bf->fd);
+    fseek(bf->fd, 0L, SEEK_SET);
 
-  if (useRrs) {
-    strncpy ( Buf, "x-amz-storage-class: REDUCED_REDUNDANCY", sizeof(Buf) );
-    slist = curl_slist_append(slist, Buf );  }
+    IOParameters params;
+    params.date_str = date_str;
+    params.signature = signature;
+    params.resource_name = resource_name;
+    params.resource_path = resource_path;
+    params.bucket = bucket;
+    params.bf = bf;
+    params.level = 9;
+    params.remote = cr_aws_put_run;
+    mzx_copy_deflate_remote(params);
 
-  snprintf ( Buf, sizeof(Buf), "Date: %s", date_str );
-  slist = curl_slist_append(slist, Buf );
-  snprintf ( Buf, sizeof(Buf), "Authorization: AWS %s:%s", awsKeyID, signature );
-  slist = curl_slist_append(slist, Buf );
-
-  snprintf ( Buf, sizeof(Buf), "http://%s.%s/%s", bucket, S3Host , resource_name );
-
-  FILE *f = fopen(resource_path, "rb");
-  fseek(f, 0L, SEEK_END);
-  bf->len = ftell(f);
-  fseek(f, 0L, SEEK_SET);
-  curl_easy_setopt ( ch, CURLOPT_READDATA, f );
-
-  curl_easy_setopt ( ch, CURLOPT_HTTPHEADER, slist);
-  curl_easy_setopt ( ch, CURLOPT_URL, Buf );
-  //curl_easy_setopt ( ch, CURLOPT_READDATA, bf );
-  curl_easy_setopt ( ch, CURLOPT_WRITEFUNCTION, writedummyfunc );
-  //curl_easy_setopt ( ch, CURLOPT_READFUNCTION, readfunc );
-  curl_easy_setopt ( ch, CURLOPT_HEADERFUNCTION, header );
-  curl_easy_setopt ( ch, CURLOPT_HEADERDATA, bf );
-  curl_easy_setopt ( ch, CURLOPT_VERBOSE, 0 );
-  curl_easy_setopt ( ch, CURLOPT_UPLOAD, 1 );
-  curl_easy_setopt ( ch, CURLOPT_INFILESIZE, bf->len );
-  curl_easy_setopt ( ch, CURLOPT_FOLLOWLOCATION, 1 );
-
-  int  sc  = curl_easy_perform(ch);
-  curl_slist_free_all(slist);
-  curl_easy_cleanup(ch);
-  fclose(f);
-
-  printf("BF code: %d\n", bf->code);
+    fclose(bf->fd);
 }

@@ -1,9 +1,14 @@
 /doc/
 /libs/
-/.crystal/
-/.shards/
+/.*
 /bck/
 /test/
 /Work/
 /rst/
 /bck/
+/spectest/
+*.so
+*.o
+*.swp
+cfrbck
+shard.*
