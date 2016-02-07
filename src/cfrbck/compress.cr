@@ -1,4 +1,4 @@
-@[Link("minizs3")]
+@[Link("miniz")]
 lib LibMS
   fun mz_compress(pDest: UInt8*, pDest_len: UInt32*, pSource: UInt8*, source_len: Int32): Int8
   fun mz_uncompress(pDest: UInt8*, pDest_len: UInt32*, pSource: UInt8*, source_len: Int32): Int8

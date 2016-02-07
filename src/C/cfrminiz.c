@@ -51,7 +51,7 @@ size_t mzx_copy_deflate_remote_stepper(void * ptr, size_t size, size_t nmemb, vo
   unsigned int actual_read_count;
   if(infile_remaining == 0) {
     printf("0:DONE\n");
-    return CURL_READFUNC_ABORT;
+    return 0;
   }
   if ((actual_read_count = fread(ptr, 1, n, ((IOStreamDescriptor *)stream)->fd)) == 0) {
     printf("READ 0\n");

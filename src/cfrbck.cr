@@ -55,7 +55,7 @@ module Cfrbck
       parser.on("-z", "--compress", "Compress artefacts (backup)") { compress = true }
       parser.on("-x pattern", "--exclude=pattern", "Exclude files matching pattern (backup)") { |pattern| excluded << Regex.new pattern }
       parser.on("-c name", "--catalog=name", "Use catalog for time machine (restore)") { |name| catalog = name }
-      parser.on("-l name", "--platform=name", "Storage platform (local|pipe)") { |name| platform = name }
+      parser.on("-l name", "--platform=name", "Storage platform (local|s3)") { |name| platform = name }
       parser.on("-a name", "--auth=name", "File containing credentials for platform") { |name| auth_file_name = name }
       parser.on("-f", "--force", "Force continue on failure (restore)") { force = true }
       parser.on("--dry-run", "Dry run (no operation will be performed)") { dry_run = true }

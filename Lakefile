@@ -1,7 +1,7 @@
 Task.build
-    puts "Building C compression library: miniz; S3 gateway"
-    `cd src/C && gcc -I/usr/local/opt/openssl/include -c miniz.c cfrminiz.c cfrs3helper.c && gcc -shared -lcrypto -lcurl -o libminizs3.so cfrminiz.o cfrs3helper.o`
-    `cp src/C/libminizs3.so . && cd ../..`
+    puts "Building C compression library: miniz"
+    `cd src/C && gcc -I/usr/local/opt/openssl/include -c miniz.c cfrminiz.c && gcc -shared -lcrypto -o libminiz.so cfrminiz.o`
+    `cp src/C/libminiz.so . && cd ../..`
 
 Task.install
     `sudo cp cfrbck /usr/local/bin/cfrbck`

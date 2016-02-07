@@ -95,7 +95,7 @@ module FS
                 FileUtil::Action::EXPAND : FileUtil::Action::PRESERVE
             @file_util.copy(
                 File.join(start_dir, store_name),
-                file_path,
+                ResourcePath.new(store_name, file_path),
                 compress)
             FileUtil.chmod(file_path,
                 ((instance as Hash)["perm"] as String).to_i,

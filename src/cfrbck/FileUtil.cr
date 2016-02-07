@@ -22,8 +22,6 @@ module FileUtil extend self
       LocalUtil::Actor.new
     when "s3"
       S3Util::Actor.new auth_file_name
-    when "pipe"
-      PipeUtil::Actor.new
     else
       raise FileUtilException.new "Unknown platform type"
     end
@@ -72,10 +70,53 @@ module FileUtil extend self
     sorted_paths.sort
   end
 
+  def prepare(location : String)
+    if !File.exists?(location)
+      Dir.mkdir(location)
+    end
+  end
+
+  def retrieve_catalog(location : String, new_catalog_id : UInt32): RetrieveCatalogResult
+    ref_catalog = ""
+
+    d = Dir.new location
+    # not using glob() as I do not wish to change directory
+    d.each do |fe|
+      fe.match(/catalog([0-9]+)\.yml/) do |match|
+        if match[1].to_i >= new_catalog_id
+          new_catalog_id = 1 + match[1].to_i
+          ref_catalog = fe.to_s
+        end
+      end
+    end
+
+    RetrieveCatalogResult.new ref_catalog, new_catalog_id
+  end
+
+  def write_catalog(location : String, new_catalog_id : UInt32, caller)
+    path = catalog_path(location, new_catalog_id)
+    File.open(path, "w") { |f| YAML.dump(caller, f) }
+    File.size(path)
+  end
+
+  def catalog_path(location, catalog_id)
+    File.join(location, catalog_name catalog_id)
+  end
+
+  def catalog_name(catalog_id)
+    "catalog#{catalog_id.to_s}.yml"
+  end
+
   class FileUtilException < Exception
   end
 
   class FileCompressionException < FileUtilException
+  end
+
+  record RetrieveCatalogResult, ref_catalog, new_catalog_id do
+    def new_catalog_id_u32
+      UInt32.new new_catalog_id
+    end
   end
 
   class Math
