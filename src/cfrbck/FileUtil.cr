@@ -16,12 +16,12 @@ module FileUtil extend self
     EXPAND
   end
 
-  def get_actor(platform_name, auth_file_name)
-    case platform_name
+  def get_actor(config)
+    case config.platform_name
     when "local"
-      LocalUtil::Actor.new
+      LocalUtil::Actor.new config
     when "s3"
-      S3Util::Actor.new auth_file_name
+      S3Util::Actor.new config
     else
       raise FileUtilException.new "Unknown platform type"
     end

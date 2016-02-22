@@ -10,3 +10,12 @@ Task.install
 Task.cleantests
     `rm -rf bck`
     `rm -rf rst`
+
+Task.testbackup
+    `./cfrbck -d -r 1 -s test backup`
+
+Task.testrestore
+    `./cfrbck -d -r 1 -s bck -o rst -f restore`
+
+Task.help
+    puts "Targets: build, install, cleantests, testbackup"

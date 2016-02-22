@@ -12,9 +12,9 @@ module FS
     @new_catalog_id::UInt32
 
     def initialize(config)
-      @start_dir      = FileUtil.canonical_path(config.start_dir)
-      @output_dir     = FileUtil.canonical_path(config.output_dir)
-      @file_util      = FileUtil.get_actor(config.platform_name, config.auth_file_name)
+      @start_dir      = config.start_dir  = FileUtil.canonical_path(config.start_dir)
+      @output_dir     = config.output_dir = FileUtil.canonical_path(config.output_dir)
+      @file_util      = FileUtil.get_actor(config)
       @meta_container = MetaContainer.new
       @comp_container = IndexContainer.new
       @new_catalog_id = 1_u32
@@ -197,7 +197,7 @@ module FS
         # let us compare file fingerprint
         value.entries.each do |entry|
           norm_path = @file_util.normalized_path(
-            start_dir,
+            @file_util.local_dir,
             entry.file_path)
           if !@comp_container.files.has_key?(norm_path)
             must_save_file = true
@@ -218,12 +218,12 @@ module FS
           if !dry_run
             @file_util.copy(
                 item,
-                ResourcePath.new(store_name, File.join(output_dir, store_name)),
+                ResourcePath.new(store_name, File.join(@file_util.remote_dir, store_name)),
                 compress ? FileUtil::Action::COMPRESS : FileUtil::Action::PRESERVE)
           end
         end
         sp.update value.count if verbose == 1
-        break # Uncomment to stop after first file (dev)
+        #break # Uncomment to stop after first file (dev)
       end
 
       sp.done if verbose == 1
@@ -258,7 +258,7 @@ module FS
 
     private def create_necessary_paths
       if !dry_run
-        @file_util.prepare(start_dir, output_dir)
+        @file_util.prepare
       end
     end
 
@@ -273,13 +273,13 @@ module FS
       #paths = FileUtil.sort_paths(matches)
       #paths.each do |path|
       res = @file_util.retrieve_catalog(
-          @file_util.work_dir(start_dir, output_dir), @new_catalog_id)
+          @file_util.catalog_dir, @new_catalog_id)
       ref_catalog = res.ref_catalog
       @new_catalog_id = res.new_catalog_id_u32
 
       if ref_catalog != ""
         catalog = YAML.load(File.read(File.join(
-            @file_util.work_dir(start_dir, output_dir), ref_catalog)))
+            @file_util.catalog_dir, ref_catalog)))
         # I *sincerely* hope there is a better way to detect an empty
         # YAML hierarchy than it being an empty string...
         if (catalog as Hash)["hierarchy"].to_s == ""
@@ -302,7 +302,7 @@ module FS
           fingerprint = (entry as Hash)["fingerprint"] as String
           ((entry as Hash)["instances"] as Array).each do |instance|
             norm_path = @file_util.normalized_path(
-              start_dir,
+              @file_util.local_dir,
               (instance as Hash)["instance_path"] as String)
             @comp_container.files[norm_path] = {
               "store_name" : store_name,
@@ -320,7 +320,7 @@ module FS
     private def write_metadata
       if !dry_run
         @file_util.write_catalog(
-            @file_util.work_dir(start_dir, output_dir), @new_catalog_id, self)
+            @file_util.catalog_dir, @new_catalog_id, self)
       end
     end
 

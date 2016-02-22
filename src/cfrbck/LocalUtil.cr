@@ -1,8 +1,12 @@
 module LocalUtil extend self
 
   class Actor
-    def work_dir(s, d)
-      d
+    getter local_dir, remote_dir, catalog_dir
+
+    def initialize(config)
+      @local_dir = config.start_dir
+      @remote_dir = config.output_dir
+      @catalog_dir = @remote_dir
     end
 
     def copy(source_path, dest_path, compress?)
@@ -52,8 +56,9 @@ module LocalUtil extend self
       FileUtil.normalized_path(canon, path)
     end
 
-    def prepare(location_in, location_out)
-      FileUtil.prepare(location_out)
+    def prepare
+      FileUtil.prepare(remote_dir)
+      FileUtil.prepare(catalog_dir)
     end
 
     def retrieve_catalog(location, new_catalog_id)

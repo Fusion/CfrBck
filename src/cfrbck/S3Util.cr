@@ -7,18 +7,20 @@ module S3Util extend self
 
   class Actor
     S3Host = "s3.amazonaws.com"
+    getter local_dir, remote_dir, catalog_dir
 
-    def initialize(auth_file_name)
-      ini = IniFile.load(File.read FileUtil.canonical_path auth_file_name)
+    def initialize(config)
+      ini = IniFile.load(File.read FileUtil.canonical_path config.auth_file_name)
       @aws_keyid = ini["s3"]["id"]
       @aws_bucket = ini["s3"]["bucket"]
       @aws_access_control = "public-read"
       @aws_mime_type = "text/plain"
       @aws_key = ini["s3"]["secret"]
-    end
 
-    def work_dir(s, d)
-      s + ".tmp"
+      @local_dir = config.start_dir
+      @remote_dir = config.output_dir
+      @tmp_dir = @local_dir.not_nil! + ".tmp"
+      @catalog_dir = @tmp_dir
     end
 
     def copy(source_path, dest_path, compress?)
@@ -132,8 +134,8 @@ module S3Util extend self
       FileUtil.normalized_path(canon, path)
     end
 
-    def prepare(location_in, location_out)
-      FileUtil.prepare(location_in + ".tmp")
+    def prepare
+      FileUtil.prepare(catalog_dir)
     end
 
     def retrieve_catalog(location, new_catalog_id)

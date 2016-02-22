@@ -6,7 +6,7 @@ module FS
     def initialize(config)
       @start_dir     = FileUtil.canonical_path(config.start_dir)
       @output_dir    = FileUtil.canonical_path(config.output_dir)
-      @file_util     = FileUtil.get_actor(config.platform_name, config.auth_file_name)
+      @file_util     = FileUtil.get_actor(config)
       @catalog_name  = ""
       @platform_name = ""
       @force         = false
